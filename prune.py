@@ -14,8 +14,6 @@ import resnet
 
 def load_checkpoint(model, filename):
     checkpoint = torch.load(filename,map_location=torch.device('cuda:1'))
-    print('Load model score:', checkpoint['score'])
-    state_dict = checkpoint['state_dict']
     own_state = model.state_dict()
     for name, param in state_dict.items():
         own_state[name].copy_(param)
