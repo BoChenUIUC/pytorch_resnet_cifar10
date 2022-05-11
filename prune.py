@@ -51,7 +51,6 @@ class FisherPruningHook():
         pruning=True,
         delta='acts',
         interval=10,
-        reg=False,
         trained_mask=False,
         noise_mask=False,
         deploy_from=None,
@@ -63,7 +62,6 @@ class FisherPruningHook():
 
         assert delta in ('acts', 'flops')
         self.pruning = pruning
-        self.reg = reg
         self.trained_mask = trained_mask
         self.noise_mask = noise_mask
         self.delta = delta
@@ -148,10 +146,10 @@ class FisherPruningHook():
             if n: m.name = n
             if self.pruning:
                 self.add_pruning_attrs(m, pruning=self.pruning)
-            if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Linear) or isinstance(m, Bitparm):
+            if isinstance(m, nn.Conv2d):
                 self.conv_names[m] = n
                 self.name2module[n] = m
-            elif isinstance(m, nn.LayerNorm) or isinstance(m, GDN):
+            elif isinstance(m, nn.BatchNorm2d):
                 self.ln_names[m] = n
                 self.name2module[n] = m
 
@@ -376,13 +374,11 @@ class FisherPruningHook():
                 # zero in `in_mask` of a specific conv_module.
                 # this affects both current and ancestor module
                 # flops per channel
-                in_rep = module.in_rep if type(module).__name__ == 'Linear' else 1
                 delta_flops = self.flops[module] * module.out_mask.sum() / (
-                    module.in_channels * module.out_channels) * in_rep
+                    module.in_channels * module.out_channels)
                 for ancestor in ancestors:
-                    out_rep = ancestor.out_rep if type(module).__name__ == 'Linear' else 1
                     delta_flops += self.flops[ancestor] * ancestor.in_mask.sum(
-                    ) / (ancestor.in_channels * ancestor.out_channels) * out_rep
+                    ) / (ancestor.in_channels * ancestor.out_channels)
                 fisher /= (float(delta_flops) / 1e9)
                 mag /= (float(delta_flops) / 1e9)
                 grad /= (float(delta_flops) / 1e9)
@@ -390,8 +386,7 @@ class FisherPruningHook():
                 # activation only counts ancestors
                 delta_acts = 0
                 for ancestor in ancestors:
-                    out_rep = ancestor.out_rep if type(module).__name__ == 'Linear' else 1
-                    delta_acts += self.acts[ancestor] / ancestor.out_channels * out_rep
+                    delta_acts += self.acts[ancestor] / ancestor.out_channels
                 fisher /= (float(max(delta_acts, 1.)) / 1e6)
                 mag /= (float(max(delta_acts, 1.)) / 1e6)
                 grad /= (float(max(delta_acts, 1.)) / 1e6)
@@ -433,9 +428,7 @@ class FisherPruningHook():
             info.update(self.find_pruning_channel(group, fisher, in_mask, info))
                 
         module, channel = info['module'], info['channel']
-        if self.reg:
-            self.add_reg_to_grad()
-        elif self.trained_mask or self.noise_mask:
+        if self.trained_mask or self.noise_mask:
             pass
         else:
             # only modify in_mask is sufficient
@@ -446,146 +439,7 @@ class FisherPruningHook():
             elif module is not None:
                 # the case for single module
                 module.in_mask[channel] = 0
-                
-    def update_module_grad(self, module, penalty, fisher):
-        # get weight
-        if hasattr(module, 'weight'):
-            w = module.weight
-        else:
-            w = module.h
-        # broadcast penalty of channels to each weight
-        if type(module).__name__ == 'Conv2d':
-            penalty = penalty.view(1,-1,1,1)
-            fisher = fisher.view(1,-1,1,1)
-        elif type(module).__name__ == 'ConvTranspose2d':
-            penalty = penalty.view(-1,1,1,1)
-            fisher = fisher.view(-1,1,1,1)
-        elif type(module).__name__ == 'Linear':
-            penalty = penalty.repeat(module.in_rep).view(1,-1)
-            fisher = fisher.repeat(module.in_rep).view(1,-1)
-        elif type(module).__name__ == 'Bitparm':
-            penalty = penalty.view(1,-1,1,1)
-            fisher = fisher.view(1,-1,1,1)
-        # update weight
-        w_grad = w.grad
-        w = w.detach()
-        grad_adjust = -fisher*(w_grad + w*w_grad*w_grad)
-        grad_adjust *= penalty
-        if hasattr(module, 'weight'):
-            module.weight.grad += grad_adjust
-        else:
-            module.h.grad += grad_adjust
             
-    def add_reg_to_grad(self):
-        # need to make sure ranking is correct and effective
-        # remove 0?
-        sorted, indices = self.fisher_list.sort(dim=0)
-        zero_count = len(self.fisher_list) - torch.count_nonzero(self.fisher_list)
-        indices = indices[zero_count:]
-        # need to let original channel know the order or rank
-        # negative factor?
-        # start penalty, decay rate, num of groups, pos or neg
-        penalty_factors = [1e-3, 1e-6, 1e-9, 1e-12]
-        num_groups = len(penalty_factors)
-        split_size = len(self.fisher_list)//num_groups + 1
-        ind_groups = torch.split(indices, split_size)
-        # after ranking, put all group results back
-        penalty_list = torch.zeros_like(self.fisher_list).double()
-        fisher_avg_list = []
-        for ind_group,penalty_factor in zip(ind_groups,penalty_factors):
-            penalty_list[ind_group] += penalty_factor
-            fisher_avg_list.append(float(self.fisher_list[ind_group].mean()))
-        #print(fisher_avg_list)
-        
-        mask_start = 0
-        for module, name in self.conv_names.items():
-            if self.group_modules is not None and module in self.group_modules:
-                continue
-            mask_len = len(module.in_mask.view(-1))
-            penalty = penalty_list[mask_start:mask_start+mask_len]
-            fisher = self.fisher_list[mask_start:mask_start+mask_len].detach()
-            self.update_module_grad(module, penalty, fisher)
-            mask_start += mask_len
-            
-        for group in self.groups:
-            mask_len = len(self.groups[group][0].in_mask.view(-1))
-            for module in self.groups[group]:
-                penalty = penalty_list[mask_start:mask_start+mask_len]
-                fisher = self.fisher_list[mask_start:mask_start+mask_len].detach()
-                self.update_module_grad(module, penalty, fisher)
-            mask_start += mask_len
-            
-    def computation_penalty(self):
-        # compute overhead based on flops or acts
-        # refer to parent/child for out channels
-        def sigmoid(x):
-            return 1/((-x).exp()+1)
-        cost_list = None
-        mask_list = None
-        max_cost = None
-        for module, name in self.conv_names.items():
-            if self.group_modules is not None and module in self.group_modules:
-                continue
-            ancestors = self.conv2ancest[module]
-            layer_name = type(module).__name__
-            cost = sigmoid(module.soft_mask)
-            if self.delta == 'flops':
-                in_rep = module.in_rep if type(module).__name__ == 'Linear' else 1
-                real_out_channels = F.sigmoid(module.child.soft_mask).sum() if hasattr(module, 'child') else module.out_channels
-                delta_flops = self.flops[module] * real_out_channels / (
-                    module.in_channels * module.out_channels) * in_rep
-                for ancestor in ancestors:
-                    out_rep = ancestor.out_rep if type(module).__name__ == 'Linear' else 1
-                    delta_flops += self.flops[ancestor] * F.sigmoid(ancestor.soft_mask).sum(
-                    ) / (ancestor.in_channels * ancestor.out_channels) * out_rep
-                delta = (float(delta_flops) / 1e9)
-            elif self.delta == 'acts':
-                delta_acts = 0
-                for ancestor in ancestors:
-                    out_rep = ancestor.out_rep if type(module).__name__ == 'Linear' else 1
-                    delta_acts += self.acts[ancestor] / ancestor.out_channels * out_rep
-                delta = (float(max(delta_acts, 1.)) / 1e6)
-            if cost_list is None:
-                cost_list = cost*delta
-                mask_list = cost
-                max_cost = cost.numel() * delta
-            else:
-                cost_list = torch.cat((cost_list,cost*delta))
-                mask_list = torch.cat((mask_list,cost))
-                max_cost += cost.numel() * delta
-        for group in self.groups:
-            module = self.groups[group][0]
-            flops = 0  
-            acts = 0            
-            cost = sigmoid(self.groups[group][0].soft_mask)
-            for module in self.groups[group]:
-                layer_name = type(module).__name__
-                # accumulate flops and acts
-                real_out_channels = F.sigmoid(module.child.soft_mask).sum() if hasattr(module, 'child') else module.out_channels
-                if type(module).__name__ != 'Bitparm': 
-                    delta_flops = self.flops[module] // module.in_channels // \
-                        module.out_channels * real_out_channels
-                else:
-                    delta_flops = self.flops[module] // module.in_channels
-                flops += delta_flops
-            for module in self.ancest[group]:
-                if type(module).__name__ != 'Bitparm': 
-                    delta_flops = self.flops[module] // module.out_channels // \
-                            module.in_channels * F.sigmoid(module.soft_mask).sum()
-                else:
-                    delta_flops = self.flops[module] // module.out_channels
-                flops += delta_flops
-                acts += self.acts[module] // module.out_channels
-            if self.delta == 'flops':
-                delta = float(flops / 1e9)
-            elif self.delta == 'acts':
-                delta = float(acts / 1e6)
-            max_cost += cost.numel()*delta
-            cost_list = torch.cat((cost_list,cost*delta))
-            mask_list = torch.cat((mask_list,cost))
-            
-        return cost_list.sum()/max_cost
-
     def accumulate_fishers(self):
         """Accumulate all the fisher during self.interval iterations."""
 
@@ -611,11 +465,8 @@ class FisherPruningHook():
                 self.temp_fisher_info[group] += module_fisher 
                 # accumulate flops per in_channel per batch for each group
                 real_out_channels = module.child.in_mask.sum() if hasattr(module, 'child') else module.out_channels
-                if type(module).__name__ != 'Bitparm': 
-                    delta_flops = self.flops[module] // module.in_channels // \
-                        module.out_channels * real_out_channels
-                else:
-                    delta_flops = self.flops[module] // module.in_channels
+                delta_flops = self.flops[module] // module.in_channels // \
+                    module.out_channels * real_out_channels
                 self.flops[group] += delta_flops
 
             # sum along the dim of batch
@@ -626,11 +477,8 @@ class FisherPruningHook():
             # impact on group ancestors, whose out channels are coupled with its
             # in_channels
             for module in self.ancest[group]:
-                if type(module).__name__ != 'Bitparm': 
-                    delta_flops = self.flops[module] // module.out_channels // \
-                            module.in_channels * module.in_mask.sum()
-                else:
-                    delta_flops = self.flops[module] // module.out_channels
+                delta_flops = self.flops[module] // module.out_channels // \
+                    module.in_channels * module.in_mask.sum()
                 self.flops[group] += delta_flops
                 acts = self.acts[module] // module.out_channels
                 self.acts[group] += acts
@@ -665,20 +513,11 @@ class FisherPruningHook():
             module (nn.Module): the module of register hook
         """
         layer_name = type(module).__name__
-        if layer_name in ['Conv2d', 'ConvTranspose2d']:
+        if layer_name in ['Conv2d']:
             n, oc, oh, ow = module.output_size
             ic = module.in_channels
             kh, kw = module.kernel_size
             self.flops[module] += np.prod([n, oc, oh, ow, ic, kh, kw])
-            self.acts[module] += np.prod([n, oc, oh, ow])
-        elif layer_name in ['Linear']:
-            n, sl, oc = module.output_size
-            ic = module.weight.size(1)
-            self.flops[module] += np.prod([n, sl, oc, ic])
-            self.acts[module] += np.prod([n, sl, oc])
-        elif layer_name in ['Bitparm']:
-            n, oc, oh, ow = module.output_size
-            self.flops[module] += np.prod([n, oc, oh, ow])
             self.acts[module] += np.prod([n, oc, oh, ow])
         else:
             print('Unrecognized in save_input_forward_hook:',layer_name)
@@ -688,11 +527,8 @@ class FisherPruningHook():
             def compute_fisher(input, grad_input, layer_name):
                 # information per mask channel per module
                 grads = input * grad_input
-                if layer_name in ['Conv2d', 'ConvTranspose2d', 'Bitparm']:
+                if layer_name in ['Conv2d']:
                     grads = grads.sum(-1).sum(-1).sum(0)
-                elif layer_name in ['Linear']:
-                    grads = grads.sum(0).sum(0)
-                    grads = grads.view(module.in_rep,-1).sum(0)
                 else:
                     print('Unrecognized in compute_fisher:',layer_name)
                     exit(0)
@@ -701,11 +537,8 @@ class FisherPruningHook():
             def compute_mag(input, grad_input, layer_name):
                 # information per mask channel per module
                 grads = torch.abs(input)
-                if layer_name in ['Conv2d', 'ConvTranspose2d', 'Bitparm']:
+                if layer_name in ['Conv2d']:
                     grads = grads.sum(-1).sum(-1).sum(0)
-                elif layer_name in ['Linear']:
-                    grads = grads.sum(0).sum(0)
-                    grads = grads.view(module.in_rep,-1).sum(0)
                 else:
                     print('Unrecognized in compute_fisher:',layer_name)
                     exit(0)
@@ -714,11 +547,8 @@ class FisherPruningHook():
             def compute_grad(input, grad_input, layer_name):
                 # information per mask channel per module
                 grads = torch.abs(grad_input)
-                if layer_name in ['Conv2d', 'ConvTranspose2d', 'Bitparm']:
+                if layer_name in ['Conv2d']:
                     grads = grads.sum(-1).sum(-1).sum(0)
-                elif layer_name in ['Linear']:
-                    grads = grads.sum(0).sum(0)
-                    grads = grads.view(module.in_rep,-1).sum(0)
                 else:
                     print('Unrecognized in compute_fisher:',layer_name)
                     exit(0)
@@ -730,6 +560,7 @@ class FisherPruningHook():
             self.temp_mag_info[module] += compute_mag(feature, grad_feature, layer_name)
             self.temp_grad_info[module] += compute_grad(feature, grad_feature, layer_name)
             
+        # alternate way to compute fisher information
         #if inputs[0].requires_grad:
             #inputs[0].register_hook(backward_hook)
         #    self.conv_inputs[module].append(inputs)
@@ -746,13 +577,8 @@ class FisherPruningHook():
         def compute_fisher(weight, grad_weight, layer_name):
             # information per mask channel per module
             grads = weight*grad_weight
-            if layer_name in ['Conv2d', 'Bitparm']:
+            if layer_name in ['Conv2d']:
                 grads = grads.sum(-1).sum(-1).sum(0)
-            elif layer_name in ['ConvTranspose2d']:
-                grads = grads.sum(-1).sum(-1).sum(-1)
-            elif layer_name in ['Linear']:
-                grads = grads.sum(0)
-                grads = grads.view(module.in_rep,-1).sum(0)
             else:
                 print('Unrecognized in compute_fisher:',layer_name)
                 exit(0)
@@ -761,13 +587,8 @@ class FisherPruningHook():
         def compute_mag(weight, grad_weight, layer_name):
             # information per mask channel per module
             grads = torch.abs(weight)
-            if layer_name in ['Conv2d', 'Bitparm']:
+            if layer_name in ['Conv2d']:
                 grads = grads.sum(-1).sum(-1).sum(0)
-            elif layer_name in ['ConvTranspose2d']:
-                grads = grads.sum(-1).sum(-1).sum(-1)
-            elif layer_name in ['Linear']:
-                grads = grads.sum(0)
-                grads = grads.view(module.in_rep,-1).sum(0)
             else:
                 print('Unrecognized in compute_fisher:',layer_name)
                 exit(0)
@@ -776,20 +597,15 @@ class FisherPruningHook():
         def compute_grad(weight, grad_weight, layer_name):
             # information per mask channel per module
             grads = torch.abs(grad_weight)
-            if layer_name in ['Conv2d', 'Bitparm']:
+            if layer_name in ['Conv2d']:
                 grads = grads.sum(-1).sum(-1).sum(0)
-            elif layer_name in ['ConvTranspose2d']:
-                grads = grads.sum(-1).sum(-1).sum(-1)
-            elif layer_name in ['Linear']:
-                grads = grads.sum(0)
-                grads = grads.view(module.in_rep,-1).sum(0)
             else:
                 print('Unrecognized in compute_fisher:',layer_name)
                 exit(0)
             return grads
 
         layer_name = type(module).__name__
-        weight = module.weight if layer_name not in ['Bitparm'] else module.h
+        weight = module.weight
         self.temp_fisher_info[module] += compute_fisher(weight, weight.grad, layer_name)
         self.temp_mag_info[module] += compute_mag(weight, weight.grad, layer_name)
         self.temp_grad_info[module] += compute_grad(weight, weight.grad, layer_name)
@@ -859,9 +675,9 @@ class FisherPruningHook():
         # TODO remove this
         self.conv_names_group = [[item.name for item in v]
                                  for idx, v in self.groups.items()]
-#         for g in self.conv_names_group:
-#             print(g)
-#         exit(0)
+        for g in self.conv_names_group:
+            print(g)
+        exit(0)
 
     def set_group_masks(self, model):
         """the modules(convolutions and BN) connect to same convolutions need
@@ -896,152 +712,34 @@ class FisherPruningHook():
             dict: the key is the module match the pattern(Conv or Fc),
              and value is the list of it's nearest ancestor 
         """
-        def name2ancest(n):
-            if 'mvEncoder' in n:
-                net_name = 'mvEncoder' 
-                d = 8
-            elif 'resEncoder' in n:
-                net_name = 'resEncoder'
-                d = 4
-            elif 'respriorEncoder' in n:
-                net_name = 'respriorEncoder'
-                d = 1
-            else:
-                print('Unrecognized net name:',n)
-                exit(0)
-            if 'to_qkv' in n:
-                a,b = re.findall(r'\d+',n)
-                if a == '0' and b == '0':
-                    ancest_name = [f'{net_name}.conv{d}']
-                elif b == '0':
-                    ancest_name = [f'{net_name}.conv{d}', f'{net_name}.layers.{int(a)-1}.2.fn.net.3']
-                else:
-                    ancest_name = [f'{net_name}.conv{d}', f'{net_name}.layers.{a}.0.fn.to_out.0']
-            elif 'to_out' in n:
-                a,b,c = re.findall(r'\d+',n)
-                ancest_name = [f'{net_name}.layers.{a}.{b}.fn.to_qkv']
-            elif 'norm' in n:
-                a,b = re.findall(r'\d+',n)
-                if a == '0' and b == '0':
-                    ancest_name = [f'{net_name}.conv{d}']
-                elif b == '0':
-                    ancest_name = [f'{net_name}.layers.{int(a)-1}.2.fn.net.3']
-                else:
-                    ancest_name = [f'{net_name}.layers.{a}.{int(b)-1}.fn.to_out.0']
-            elif 'net' in n:
-                a,b,c = re.findall(r'\d+',n)
-                if c == '0':
-                    ancest_name = [f'{net_name}.conv{d}', f'{net_name}.layers.{a}.{int(b)-1}.fn.to_out.0']
-                else:
-                    ancest_name = [f'{net_name}.layers.{a}.{b}.fn.net.0']
-            else:
-                print('Unexpected in find_module_ancestors:',n)
-                exit(0)
-            return ancest_name
         import re
         conv2ancest = {}
         ln2ancest = {}
         for n, m in model.named_modules():
-            if type(m).__name__ not in ['Conv2d','ConvTranspose2d','Linear','LayerNorm','Bitparm','GDN']:
+            if type(m).__name__ not in ['Conv2d','BatchNorm2d']:
                 continue
             # independent nets
-            if 'opticFlow' in n:
-                mi,ci = [int(c) for c in n if c.isdigit()]
-                if ci==1:
-                    ancest_name = []
-                else:
-                    ancest_name = [f'opticFlow.moduleBasic.{mi}.conv{ci-1}']
-            elif 'mvEncoder' in n:
-                if 'conv' in n:
-                    a, = re.findall(r'\d+',n)
-                    if a == '1':
-                        ancest_name = []
-                    else:
-                        ancest_name = [f'mvEncoder.conv{int(a)-1}']
-                elif 'layers' in n:
-                    ancest_name = name2ancest(n)
-                else:
-                    print('Unexpected layer in mvEncoder')
-            elif 'mvDecoder' in n:
-                a, = re.findall(r'\d+',n)
-                if a == '1':
-                    ancest_name = ['mvEncoder.conv8',f'bitEstimator_mv.f4']
-                else:
-                    ancest_name = [f'mvDecoder.deconv{int(a)-1}']
-            elif 'warpnet' in n:
-                if 'feature_ext' in n:
-                    ancest_name = []
-                else:
-                    cl = [int(c) for c in n if c.isdigit()]
-                    if len(cl)==1:
-                        ancest_name = ['warpnet.feature_ext','warpnet.conv5.conv2']
-                    elif cl[1]==1:
-                        if cl[0]==0:
-                            ancest_name = ['warpnet.feature_ext']
+            if 'module.conv1' == n:
+                ancest_name = []
+            elif 'conv' in n:
+                a,b,c = re.findall(r'\d+',n)
+                if c == 1:
+                    if b == 0:
+                        if a == 1:
+                            ancest_name = []
                         else:
-                            ancest_name = ['warpnet.feature_ext',f'warpnet.conv{cl[0]-1}.conv2']
+                            ancest_name = ['module.conv1',f'module.layer{a-1}.8.conv2']
                     else:
-                        ancest_name = [f'warpnet.conv{cl[0]}.conv1']
-            elif 'resEncoder' in n:
-                if 'conv' in n:
-                    a, = re.findall(r'\d+',n)
-                    if a == '1':
-                        ancest_name = []
-                    else:
-                        ancest_name = [f'resEncoder.conv{int(a)-1}']
-                elif 'layers' in n:
-                    ancest_name = name2ancest(n)
-                elif 'gdn' in n:
-                    ancest_name = [f'resEncoder.conv{a}']
-            elif 'resDecoder' in n:
-                a, = re.findall(r'\d+',n)
-                if 'deconv' in n:
-                    if a == '1':
-                        ancest_name = [f'resEncoder.conv4']
-                    else:
-                        ancest_name = [f'resDecoder.deconv{int(a)-1}']
-                elif 'igdn' in n:
-                    ancest_name = [f'resDecoder.deconv{a}']
-            elif 'respriorEncoder' in n:
-                if 'conv' in n:
-                    a, = re.findall(r'\d+',n)
-                    if a == '1':
-                        ancest_name = ['resEncoder.conv4','resEncoder.layers.11.2.fn.net.3']
-                    elif a == '2':
-                        ancest_name = ['respriorEncoder.conv1',f'respriorEncoder.layers.11.2.fn.net.3']
-                    else:
-                        ancest_name = [f'respriorEncoder.conv{int(a)-1}']
-                elif 'layers' in n:
-                    ancest_name = name2ancest(n)
+                        ancest_name = ['module.conv1',f'module.layer{a}.0.conv2']
                 else:
-                    print('Unexpected layer in resEncoder')
-            elif 'respriorDecoder' in n:
-                a, = re.findall(r'\d+',n)
-                if a == '1':
-                    ancest_name = [f'respriorEncoder.conv3']
-                else:
-                    ancest_name = [f'respriorDecoder.deconv{int(a)-1}']
-            elif 'bitEstimator_mv' in n:
-                a, = re.findall(r'\d+',n)
-                if a == '1':
-                    # first to make sure them in same group
-                    # second to make sure the ancestor get the correct out channel
-                    ancest_name = ['mvEncoder.conv8','mvEncoder.layers.11.2.fn.net.3']
-                else:
-                    ancest_name = ['mvEncoder.conv8',f'bitEstimator_mv.f{int(a)-1}']
-            elif 'bitEstimator_z' in n:
-                a, = re.findall(r'\d+',n)
-                if a == '1':
-                    ancest_name = ['respriorEncoder.conv3']
-                else:
-                    ancest_name = ['respriorEncoder.conv3',f'bitEstimator_z.f{int(a)-1}']
+                    ancest_name = ['module.layer{a}.{b}.conv1']
 
-            if type(m).__name__ in ['Conv2d','ConvTranspose2d','Linear','Bitparm']:
+            if type(m).__name__ in ['Conv2d']:
                 conv2ancest[m] = []
             else:
                 ln2ancest[m] = []
             for name in ancest_name:
-                if type(m).__name__ in ['Conv2d','ConvTranspose2d','Linear','Bitparm']:
+                if type(m).__name__ in ['Conv2d']:
                     conv2ancest[m] += [self.name2module[name]]
                 else:
                     ln2ancest[m] += [self.name2module[name]]
@@ -1096,124 +794,9 @@ class FisherPruningHook():
                                 m.padding, m.dilation, m.groups)
                 m.output_size = output.size()
                 return output
-            module.forward = MethodType(modified_forward, module)
-        if type(module).__name__ == 'ConvTranspose2d':
-            module.register_buffer(
-                'in_mask', module.weight.new_ones((module.in_channels,), ))
-            if self.trained_mask:
-                module.register_buffer(
-                    'soft_mask', torch.nn.Parameter(torch.randn(module.in_channels)).to(module.weight.device))
-            def modified_forward(m, x):
-                if self.use_mask:
-                    if not m.finetune:
-                        if m.trained_mask:
-                            if hasattr(m, 'group_master'):
-                                mask = F.sigmoid(self.name2module[m.group_master].soft_mask)
-                            else:
-                                mask = F.sigmoid(m.soft_mask)
-                            m.in_mask[:] = mask.data
-                            mask = mask.view(1,-1,1,1)
-                            x = x * mask.to(x.device)
-                        elif m.noise_mask:
-                            mask = m.in_mask.view(1,-1,1,1).to(x.device)
-                            noise = torch.empty_like(x).uniform_(-limit, limit)*mask
-                            x = x + noise
-                        else:
-                            mask = m.in_mask.view(1,-1,1,1)
-                            x = x * mask.to(x.device)
-                    else:
-                        # if it has no ancestor
-                        # we need to mask it
-                        if x.size(1) == len(m.in_mask):
-                            x = x[:,m.in_mask.bool(),:,:]
-                output = F.conv_transpose2d(x, m.weight, bias=m.bias, stride=m.stride,
-                        padding=m.padding, output_padding=m.output_padding, groups=m.groups, dilation=m.dilation)
-                m.output_size = output.size()
-                return output
-            module.forward = MethodType(modified_forward, module)
-        if  type(module).__name__ == 'Linear':
-            module.in_channels,module.out_channels = module.weight.size(1),module.weight.size(0)
-            if 'fn.to_qkv' in module.name:
-                # qkv share the same mask
-                # 8 heads share the same mask
-                module.out_rep = 3*8
-                module.in_rep = 1
-            elif 'fn.to_out.0' in module.name:
-                # 8 heads share the same mask
-                module.out_rep = 1
-                module.in_rep = 8
-            elif 'fn.net.0' in module.name:
-                # gate and variable share the same mask in GEGLU
-                module.out_rep = 2
-                module.in_rep = 1
-            else:
-                module.out_rep = module.in_rep = 1
-            module.register_buffer(
-                'in_mask', module.weight.new_ones((module.in_channels//module.in_rep,), ))
-            if self.trained_mask:
-                module.register_buffer(
-                    'soft_mask', torch.nn.Parameter(torch.randn(module.in_channels//module.in_rep)).to(module.weight.device))
-            def modified_forward(m, x):
-                if self.use_mask:
-                    if not m.finetune:
-                        if m.trained_mask:
-                            if hasattr(m, 'group_master'):
-                                mask = F.sigmoid(self.name2module[m.group_master].soft_mask)
-                            else:
-                                mask = F.sigmoid(m.soft_mask)
-                            m.in_mask[:] = mask.data
-                            mask = mask.repeat(m.in_rep).view(1,1,-1)
-                            x = x * mask.to(x.device)
-                        elif m.noise_mask:
-                            mask = m.in_mask.repeat(m.in_rep).view(1,1,-1).to(x.device)
-                            noise = torch.empty_like(x).uniform_(-limit, limit)*mask
-                            x = x + noise
-                        else:
-                            mask = m.in_mask.repeat(m.in_rep).view(1,1,-1)
-                            x = x * mask.to(x.device)
-                output = F.linear(x, m.weight, bias=m.bias)
-                m.output_size = output.size()
-                return output
-            module.forward = MethodType(modified_forward, module)  
-        if  type(module).__name__ == 'Bitparm':
-            module.register_buffer(
-                'in_mask', module.h.new_ones((module.h.size(1),), ))
-            if self.trained_mask:
-                module.register_buffer(
-                    'soft_mask', torch.nn.Parameter(torch.randn(module.h.size(1))).to(module.h.device))
-            module.in_channels = module.out_channels = module.h.size(1)
-            def modified_forward(m, x):
-                if self.use_mask:
-                    if m.trained_mask:
-                        m.in_mask[:] = F.sigmoid(m.soft_mask)
-                    if not m.finetune:
-                        if m.trained_mask:
-                            if hasattr(m, 'group_master'):
-                                mask = F.sigmoid(self.name2module[m.group_master].soft_mask)
-                            else:
-                                mask = F.sigmoid(m.soft_mask)
-                            m.in_mask[:] = mask.data
-                            mask = mask.view(1,-1,1,1)
-                            x = x * mask.to(x.device)
-                        elif m.noise_mask:
-                            mask = m.in_mask.view(1,-1,1,1).to(x.device)
-                            noise = torch.empty_like(x).uniform_(-limit, limit)*mask
-                            x = x + noise
-                        else:
-                            mask = m.in_mask.view(1,-1,1,1)
-                            x = x * mask.to(x.device)
-                if m.final:
-                    output = F.sigmoid(x * F.softplus(m.h) + m.b)
-                else:
-                    x = x * F.softplus(m.h) + m.b
-                    output = x + F.tanh(x) * F.tanh(m.a)
-                m.output_size = output.size()
-                return output
-            module.forward = MethodType(modified_forward, module)  
-        if  type(module).__name__ == 'LayerNorm':
+            module.forward = MethodType(modified_forward, module) 
+        if  type(module).__name__ == 'BatchNorm2d':
             # no need to modify layernorm during pruning since it is not computed over channels
-            pass
-        if  type(module).__name__ == 'GDN':
             pass
 
 
@@ -1234,41 +817,7 @@ def deploy_pruning(model):
             module.weight = nn.Parameter(temp_weight[:, in_mask].data)
             module.weight.requires_grad = requires_grad
 
-        elif type(module).__name__ == 'ConvTranspose2d':
-            module.finetune = True
-            requires_grad = module.weight.requires_grad
-            out_mask = module.out_mask.bool()
-            in_mask = module.in_mask.bool()
-            if hasattr(module, 'bias') and module.bias is not None:
-                module.bias = nn.Parameter(module.bias.data[out_mask])
-                module.bias.requires_grad = requires_grad
-            temp_weight = module.weight.data[in_mask]
-            module.weight = nn.Parameter(temp_weight[:, out_mask].data)
-            module.weight.requires_grad = requires_grad
-
-        elif type(module).__name__ == 'Linear':
-            requires_grad = module.weight.requires_grad
-            out_mask = module.out_mask.bool().repeat(module.out_rep)
-            in_mask = module.in_mask.bool().repeat(module.in_rep)
-            if hasattr(module, 'bias') and module.bias is not None:
-                module.bias = nn.Parameter(module.bias.data[out_mask])
-                module.bias.requires_grad = requires_grad
-            temp_weight = module.weight.data[out_mask]
-            module.weight = nn.Parameter(temp_weight[:, in_mask].data)
-            module.weight.requires_grad = requires_grad
-
-        elif type(module).__name__ == 'Bitparm':
-            in_mask = module.in_mask.bool()
-            requires_grad = module.h.requires_grad
-            module.h = nn.Parameter(module.h.data[:,in_mask].data)
-            module.b = nn.Parameter(module.b.data[:,in_mask].data)
-            if hasattr(module, 'a') and module.a is not None:
-                module.a = nn.Parameter(module.a.data[:,in_mask].data)
-                module.a.requires_grad = requires_grad
-            module.h.requires_grad = requires_grad
-            module.b.requires_grad = requires_grad
-
-        elif type(module).__name__ == 'LayerNorm':
+        elif type(module).__name__ == 'BatchNorm2d':
             out_mask = module.out_mask.bool()
             requires_grad = module.weight.requires_grad
             module.normalized_shape = (int(out_mask.sum()),)
@@ -1276,15 +825,6 @@ def deploy_pruning(model):
             module.bias = nn.Parameter(module.bias.data[out_mask].data)
             module.weight.requires_grad = requires_grad
             module.bias.requires_grad = requires_grad
-            
-        elif type(module).__name__ == 'GDN':
-            out_mask = module.out_mask.bool()
-            requires_grad = module.beta.requires_grad
-            module.beta = nn.Parameter(module.beta.data[out_mask].data)
-            gamma = module.gamma.data[out_mask]
-            module.gamma = nn.Parameter(gamma[:,out_mask].data)
-            module.gamma.requires_grad = requires_grad
-            module.beta.requires_grad = requires_grad
 
 # to do: make sure linear works fine
 
