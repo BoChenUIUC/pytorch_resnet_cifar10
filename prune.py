@@ -728,7 +728,7 @@ class FisherPruningHook():
                     else:
                         ancest_name = ['module.conv1',f'module.layer{a}.0.conv2']
                 else:
-                    ancest_name = ['module.layer{a}.{b}.conv1']
+                    ancest_name = [f'module.layer{a}.{b}.conv1']
 
             if type(m).__name__ in ['Conv2d']:
                 conv2ancest[m] = []
