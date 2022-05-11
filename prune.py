@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from torch.nn import Conv2d, ConvTranspose2d
 import seaborn as sns
 import matplotlib.pyplot as plt
+import resnet
 
 def load_checkpoint(model, filename):
     checkpoint = torch.load(filename,map_location=torch.device('cuda:1'))
