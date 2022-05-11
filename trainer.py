@@ -88,8 +88,7 @@ def main():
             
     # optionally pruning
     if args.prune:
-        hook = FisherPruningHook(pruning=True, noise_mask=True, start_from=args.prune)
-        hook.after_build_model(model)
+        hook = FisherPruningHook(pruning=True, resume_from=args.prune)
         hook.before_run(model)
 
     cudnn.benchmark = True
@@ -144,7 +143,7 @@ def main():
 
         # train for one epoch
         print('current lr {:.5e}'.format(optimizer.param_groups[0]['lr']))
-        train(train_loader, model, criterion, optimizer, epoch, hook)
+        train(train_loader, model, criterion, optimizer, epoch, hook if args.prune else None)
         lr_scheduler.step()
 
         # evaluate on validation set
@@ -198,7 +197,8 @@ def train(train_loader, model, criterion, optimizer, epoch, hook):
         # compute gradient and do SGD step
         optimizer.zero_grad()
         loss.backward()
-        optimizer.step()
+        if hook is None or not hook.one_shot:
+            optimizer.step()
 
         output = output.float()
         loss = loss.float()

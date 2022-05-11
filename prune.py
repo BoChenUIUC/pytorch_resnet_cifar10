@@ -51,9 +51,9 @@ class FisherPruningHook():
         interval=10,
         trained_mask=False,
         noise_mask=False,
+        one_shot=False,
         deploy_from=None,
         resume_from=None,
-        start_from=None,
         save_flops_thr=[0.75, 0.5, 0.25],
         save_acts_thr=[0.75, 0.5, 0.25],
     ):
@@ -93,12 +93,10 @@ class FisherPruningHook():
         self.accum_mags = {}
         self.accum_grads = {}
         
-        
         self.channels = 0
         self.delta = delta
         self.deploy_from = deploy_from
         self.resume_from = resume_from
-        self.start_from = start_from
 
         for i in range(len(save_acts_thr) - 1):
             assert save_acts_thr[i] > save_acts_thr[i + 1]
@@ -127,9 +125,6 @@ class FisherPruningHook():
             load_checkpoint(model, self.deploy_from)
             deploy_pruning(model)
             
-        if self.start_from is not None:
-            load_checkpoint(model, self.start_from)
-
     def before_run(self, model):
         """Initialize the relevant variables(fisher, flops and acts) for
         calculating the importance of the channel, and use the layer-grouping
@@ -189,6 +184,9 @@ class FisherPruningHook():
             # register forward hook
             for module, name in self.conv_names.items():
                 module.register_forward_hook(self.save_input_forward_hook)
+        else:
+            load_checkpoint(model, self.deploy_from)
+            deploy_pruning(model)
 
         self.print_model(model, print_flops_acts=False, print_channel=False)
 
@@ -209,14 +207,13 @@ class FisherPruningHook():
             self.total_flops, self.total_acts = self.update_flop_act(model)
             # plot figure
             if itr % 1000 == 0:
-                self.iter += 1
                 # fisher
                 plt.figure(1)
                 self.fisher_list[self.fisher_list==0] = 1e-50
                 self.fisher_list = torch.log10(self.fisher_list).detach().cpu().numpy()
                 sns.displot(self.fisher_list, kind='hist', aspect=1.2)
-                #plt.savefig(f'fisher/dist_fisher_{int(self.total_flops*100):3d}_{int(self.total_acts*100):3d}_{loss:.2f}.png')
-                plt.savefig(f'fisher/dist_fisher_{self.iter}_{loss:.2f}.png')
+                plt.savefig(f'metrics/dist_fisher_{self.iter}_{int(self.total_flops*100):3d}_{int(self.total_acts*100):3d}_{loss:.2f}.png')
+                #plt.savefig(f'metrics/dist_fisher_{self.iter}_{loss:.2f}.png')
                 # magnitude
                 #plt.figure(2)
                 #self.mag_list[self.mag_list==0] = 1e-50
@@ -230,6 +227,7 @@ class FisherPruningHook():
                 #self.grad_list = torch.log10(self.grad_list).detach().cpu().numpy()
                 #sns.displot(self.grad_list, kind='hist', aspect=1.2)
                 #plt.savefig(f'fisher/dist_grad_{self.iter}_{loss:.2f}.png')
+                self.iter += 1
         self.init_flops_acts()
 
     def update_flop_act(self, model, work_dir='work_dir/'):
