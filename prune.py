@@ -1290,7 +1290,7 @@ def deploy_pruning(model):
 
 if __name__ == '__main__':
     model = torch.nn.DataParallel(resnet.__dict__['resnet56']())
-    model.cuda()
+    model.cuda(1)
     for n, m in model.named_modules():
         print(n,type(m).__name__)
     
