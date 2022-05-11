@@ -1289,7 +1289,7 @@ def deploy_pruning(model):
 # to do: make sure linear works fine
 
 if __name__ == '__main__':
-    model = torch.nn.DataParallel(resnet.__dict__[args.arch]())
+    model = torch.nn.DataParallel(resnet.__dict__['resnet56']())
     model.cuda()
     for n, m in model.named_modules():
         print(n,type(m).__name__)
