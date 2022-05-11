@@ -13,13 +13,13 @@ import matplotlib.pyplot as plt
 import resnet
 
 def load_checkpoint(model, filename):
-    checkpoint = torch.load(filename,map_location=torch.device('cuda:1'))
-    own_state = model.state_dict()
-    for name, param in state_dict.items():
-        own_state[name].copy_(param)
+    print("=> loading checkpoint '{}'".format(filename))
+    checkpoint = torch.load(filename)
+    model.load_state_dict(checkpoint['state_dict'])
+    print("=> loaded checkpoint '{}' (epoch {}) for pruning")
 
-def save_checkpoint(model, filename, score=0):
-    state = {'state_dict': model.state_dict(), 'score':score}
+def save_checkpoint(model, filename):
+    state = {'state_dict': model.state_dict()}
     torch.save(state, filename)
 
 class FisherPruningHook():
