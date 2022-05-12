@@ -721,6 +721,7 @@ class FisherPruningHook():
                 ancest_name = []
             elif 'conv' in n:
                 a,b,c = re.findall(r'\d+',n)
+                print(a,b,c)
                 if c == 1:
                     if b == 0:
                         if a == 1:
