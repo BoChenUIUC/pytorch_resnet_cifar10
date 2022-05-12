@@ -123,7 +123,7 @@ class FisherPruningHook():
                 if n: m.name = n
                 self.add_pruning_attrs(m, pruning=self.pruning)
             load_checkpoint(model, self.deploy_from)
-            deploy_pruning(model)
+            self.deploy_pruning(model)
             
     def before_run(self, model):
         """Initialize the relevant variables(fisher, flops and acts) for
@@ -186,7 +186,7 @@ class FisherPruningHook():
                 module.register_forward_hook(self.save_input_forward_hook)
         else:
             load_checkpoint(model, self.deploy_from)
-            deploy_pruning(model)
+            self.deploy_pruning(model)
 
         self.print_model(model, print_flops_acts=False, print_channel=False)
 
@@ -267,12 +267,24 @@ class FisherPruningHook():
         if print_channel:
             for module, name in self.conv_names.items():
                 chans_i = int(module.in_mask.sum().cpu().numpy())
-                chans_o = int(module.out_mask.sum().cpu().numpy())
+                if hasattr(module, 'child'):
+                    child = self.name2module[module.child]
+                    if hasattr(child,'group_master'):
+                        child = self.name2module[child.group_master]
+                    chans_o = int(child.in_mask.sum().cpu().numpy())
+                else:
+                    chans_o = module.out_channels
                 print('{}: input_channels: {}/{}, out_channels: {}/{}'.format(
-                        name, chans_i, len(module.in_mask), chans_o, len(module.out_mask)))
+                        name, chans_i, len(module.in_mask), chans_o, len(child.in_mask)))
             for module, name in self.ln_names.items():
-                chans_o = int(module.out_mask.sum().cpu().numpy())
-                print('{}: out_channels: {}/{}'.format(name, chans_o, len(module.out_mask)))
+                if hasattr(module, 'child'):
+                    child = self.name2module[module.child]
+                    if hasattr(child,'group_master'):
+                        child = self.name2module[child.group_master]
+                    chans_o = int(child.in_mask.sum().cpu().numpy())
+                else:
+                    chans_o = module.out_channels
+                print('{}: out_channels: {}/{}'.format(name, chans_o, len(child.in_mask)))
 
     def compute_flops_acts(self):
         """Computing the flops and activation remains."""
@@ -283,7 +295,14 @@ class FisherPruningHook():
         for module, name in self.conv_names.items():
             max_flop = self.flops[module]
             i_mask = module.in_mask
-            real_out_channels = module.child.in_mask.cpu().sum() if hasattr(module, 'child') else module.out_channels
+            if hasattr(module, 'child'):
+                child = self.name2module[module.child]
+                if hasattr(child,'group_master'):
+                    child = self.name2module[child.group_master]
+                real_out_channels = child.in_mask.cpu().sum()
+            else:
+                real_out_channels = module.out_channels
+             
             flops += max_flop / (i_mask.numel() * module.out_channels) * (
                 i_mask.cpu().sum() * real_out_channels)
             max_flops += max_flop
@@ -370,7 +389,14 @@ class FisherPruningHook():
                 # zero in `in_mask` of a specific conv_module.
                 # this affects both current and ancestor module
                 # flops per channel
-                delta_flops = self.flops[module] * module.out_mask.sum() / (
+                if hasattr(module, 'child'):
+                    child = self.name2module[module.child]
+                    if hasattr(child,'group_master'):
+                        child = self.name2module[child.group_master]
+                    chans_o = child.in_mask.sum()
+                else:
+                    chans_o = module.out_channels
+                delta_flops = self.flops[module] * chans_o / (
                     module.in_channels * module.out_channels)
                 for ancestor in ancestors:
                     delta_flops += self.flops[ancestor] * ancestor.in_mask.sum(
@@ -460,9 +486,15 @@ class FisherPruningHook():
                 module_fisher = self.temp_fisher_info[module]
                 self.temp_fisher_info[group] += module_fisher 
                 # accumulate flops per in_channel per batch for each group
-                real_out_channels = module.child.in_mask.sum() if hasattr(module, 'child') else module.out_channels
+                if hasattr(module, 'child'):
+                    child = self.name2module[module.child]
+                    if hasattr(child,'group_master'):
+                        child = self.name2module[child.group_master]
+                    chans_o = child.in_mask.sum()
+                else:
+                    chans_o = module.out_channels
                 delta_flops = self.flops[module] // module.in_channels // \
-                    module.out_channels * real_out_channels
+                    module.out_channels * chans_o
                 self.flops[group] += delta_flops
 
             # sum along the dim of batch
@@ -606,22 +638,6 @@ class FisherPruningHook():
         self.temp_mag_info[module] += compute_mag(weight, weight.grad, layer_name)
         self.temp_grad_info[module] += compute_grad(weight, weight.grad, layer_name)
 
-    def construct_outchannel_masks(self):
-        """Register the `input_mask` of one conv to it's nearest ancestor conv,
-        and name it as `out_mask`, which means the actually number of output
-        feature map after pruning."""
-
-        for conv, name in self.conv_names.items():
-            for m, ancest in self.conv2ancest.items():
-                if conv in ancest:
-                    conv.out_mask = m.in_mask
-                    break
-
-        # make sure norm and conv output are the same  
-        for bn, name in self.ln_names.items():
-            conv_module = self.ln2ancest[bn][0]
-            bn.out_mask = conv_module.out_mask
-
     def make_groups(self):
         """The modules (convolutions and BNs) connected to the same conv need
         to change the channels simultaneously when pruning.
@@ -730,6 +746,23 @@ class FisherPruningHook():
                     conv2ancest[m] += [self.name2module[name]]
                 else:
                     ln2ancest[m] += [self.name2module[name]]
+                    
+            # find child
+            if 'module.conv1' == n:
+                m.child = 'module.layer1.0.conv1'
+            elif 'conv' in n or 'bn' in n:
+                a,b,c = re.findall(r'\d+',n)
+                if c == '1':
+                    m.child = f'module.layer{a}.{b}.conv2'
+                else:
+                    if b == '8':
+                        if a == '3':
+                            pass
+                        else:
+                            m.child = f'module.layer{int(a)+1}.0.conv1'
+                    else:
+                        m.child = f'module.layer{a}.{int(b)+1}.conv1'
+            
         self.conv2ancest = conv2ancest
         self.ln2ancest = ln2ancest
 
@@ -787,31 +820,45 @@ class FisherPruningHook():
             pass
 
 
-def deploy_pruning(model):
-    """To speed up the finetune process, We change the shape of parameter
-    according to the `in_mask` and `out_mask` in it."""
+    def deploy_pruning(self, model):
+        """To speed up the finetune process, We change the shape of parameter
+        according to the `in_mask` and `out_mask` in it."""
 
-    for name, module in model.named_modules():
-        if type(module).__name__ == 'Conv2d':
-            module.finetune = True
-            requires_grad = module.weight.requires_grad
-            out_mask = module.out_mask.bool()
-            in_mask = module.in_mask.bool()
-            if hasattr(module, 'bias') and module.bias is not None:
-                module.bias = nn.Parameter(module.bias.data[out_mask])
-                module.bias.requires_grad = requires_grad
-            temp_weight = module.weight.data[out_mask]
-            module.weight = nn.Parameter(temp_weight[:, in_mask].data)
-            module.weight.requires_grad = requires_grad
+        for name, module in model.named_modules():
+            if type(module).__name__ == 'Conv2d':
+                module.finetune = True
+                requires_grad = module.weight.requires_grad
+                if hasattr(module, 'child'):
+                    child = self.name2module[module.child]
+                    if hasattr(child,'group_master'):
+                        child = self.name2module[child.group_master]
+                    out_mask = child.in_mask.bool()
+                else:
+                    out_mask = None
+                in_mask = module.in_mask.bool()
+                if hasattr(module, 'bias') and module.bias is not None and out_mask is not None:
+                    module.bias = nn.Parameter(module.bias.data[out_mask])
+                    module.bias.requires_grad = requires_grad
+                if out_mask is not None:
+                    temp_weight = module.weight.data[out_mask]
+                    module.weight = nn.Parameter(temp_weight[:, in_mask].data)
+                    module.weight.requires_grad = requires_grad
 
-        elif type(module).__name__ == 'BatchNorm2d':
-            out_mask = module.out_mask.bool()
-            requires_grad = module.weight.requires_grad
-            module.normalized_shape = (int(out_mask.sum()),)
-            module.weight = nn.Parameter(module.weight.data[out_mask].data)
-            module.bias = nn.Parameter(module.bias.data[out_mask].data)
-            module.weight.requires_grad = requires_grad
-            module.bias.requires_grad = requires_grad
+            elif type(module).__name__ == 'BatchNorm2d':
+                if hasattr(module, 'child'):
+                    child = self.name2module[module.child]
+                    if hasattr(child,'group_master'):
+                        child = self.name2module[child.group_master]
+                    out_mask = child.in_mask.bool()
+                else:
+                    out_mask = None
+                requires_grad = module.weight.requires_grad
+                if out_mask is not None:
+                    module.normalized_shape = (int(out_mask.sum()),)
+                    module.weight = nn.Parameter(module.weight.data[out_mask].data)
+                    module.bias = nn.Parameter(module.bias.data[out_mask].data)
+                    module.weight.requires_grad = requires_grad
+                    module.bias.requires_grad = requires_grad
 
 # to do: make sure linear works fine
 
