@@ -721,10 +721,9 @@ class FisherPruningHook():
                 ancest_name = []
             elif 'conv' in n:
                 a,b,c = re.findall(r'\d+',n)
-                print(a,b,c)
-                if c == 1:
-                    if b == 0:
-                        if a == 1:
+                if c == '1':
+                    if b == '0':
+                        if a == '1':
                             ancest_name = ['module.conv1']
                         else:
                             ancest_name = ['module.conv1',f'module.layer{a-1}.8.conv2']
@@ -737,7 +736,6 @@ class FisherPruningHook():
                 conv2ancest[m] = []
             else:
                 ln2ancest[m] = []
-            print(n,ancest_name)
             for name in ancest_name:
                 if type(m).__name__ in ['Conv2d']:
                     conv2ancest[m] += [self.name2module[name]]
