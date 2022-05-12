@@ -739,9 +739,10 @@ class FisherPruningHook():
             for name in ancest_name:
                 if type(m).__name__ in ['Conv2d']:
                     conv2ancest[m] += [self.name2module[name]]
-                    print(name,self.name2module[name])
                 else:
                     ln2ancest[m] += [self.name2module[name]]
+            if m in conv2ancest:
+                print([a.name for a in conv2ancest[m]])
         self.conv2ancest = conv2ancest
         self.ln2ancest = ln2ancest
 
