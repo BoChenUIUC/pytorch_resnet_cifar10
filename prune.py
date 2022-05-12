@@ -726,7 +726,7 @@ class FisherPruningHook():
                         if a == '1':
                             ancest_name = ['module.conv1']
                         else:
-                            ancest_name = ['module.conv1',f'module.layer{a-1}.8.conv2']
+                            ancest_name = ['module.conv1',f'module.layer{int(a)-1}.8.conv2']
                     else:
                         ancest_name = ['module.conv1',f'module.layer{a}.0.conv2']
                 else:
