@@ -741,8 +741,6 @@ class FisherPruningHook():
                     conv2ancest[m] += [self.name2module[name]]
                 else:
                     ln2ancest[m] += [self.name2module[name]]
-            if m in conv2ancest:
-                print(n,[a.name for a in conv2ancest[m]])
         self.conv2ancest = conv2ancest
         self.ln2ancest = ln2ancest
 
