@@ -661,11 +661,10 @@ class FisherPruningHook():
                 self.groups[idx] = modules
                 self.ancest[idx] = groups_ancest[group]
                 idx += 1
-        if self.trained_mask or self.noise_mask:
-            for id in self.groups:
-                module0 = self.groups[id][0]
-                for module in self.groups[id]:
-                    module.group_master = module0.name
+        for id in self.groups:
+            module0 = self.groups[id][0]
+            for module in self.groups[id]:
+                module.group_master = module0.name
             
         # the conv's name in same group, just for debug
         # TODO remove this
@@ -722,7 +721,7 @@ class FisherPruningHook():
                 if c == 1:
                     if b == 0:
                         if a == 1:
-                            ancest_name = []
+                            ancest_name = ['module.conv1']
                         else:
                             ancest_name = ['module.conv1',f'module.layer{a-1}.8.conv2']
                     else:
