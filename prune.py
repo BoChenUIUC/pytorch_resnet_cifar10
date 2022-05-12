@@ -665,14 +665,6 @@ class FisherPruningHook():
             module0 = self.groups[id][0]
             for module in self.groups[id]:
                 module.group_master = module0.name
-            
-        # the conv's name in same group, just for debug
-        # TODO remove this
-        self.conv_names_group = [[item.name for item in v]
-                                 for idx, v in self.groups.items()]
-        for g in self.conv_names_group:
-            print(g)
-        exit(0)
 
     def set_group_masks(self, model):
         """the modules(convolutions and BN) connect to same convolutions need
