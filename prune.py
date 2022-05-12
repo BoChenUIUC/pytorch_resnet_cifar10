@@ -643,7 +643,7 @@ class FisherPruningHook():
                     groups_ancest[group] = list(
                         module_ancest.union(group_ancest))
                     added = True
-                    print(groups[group])
+                    print([m.name for m in groups[group]])
                     break
             if not added:
                 idx += 1
