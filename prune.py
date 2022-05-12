@@ -649,6 +649,7 @@ class FisherPruningHook():
                 idx += 1
                 groups[idx] = [module]
                 groups_ancest[idx] = self.conv2ancest[module]
+                print(groups_ancest[idx].name)
         # key is the ids the group, and value contains all conv
         # of this group
         self.groups = {}
