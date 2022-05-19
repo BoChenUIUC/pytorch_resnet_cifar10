@@ -748,10 +748,9 @@ class FisherPruningHook():
                     ln2ancest[m] += [self.name2module[name]]
                     
             # find child
-            if 'module.conv1' == n:
+            if 'module.conv1' == n or 'module.bn1' == n:
                 m.child = 'module.layer1.0.conv1'
             elif 'conv' in n or 'bn' in n:
-                print(n)
                 a,b,c = re.findall(r'\d+',n)
                 if c == '1':
                     m.child = f'module.layer{a}.{b}.conv2'
