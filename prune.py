@@ -136,6 +136,9 @@ class FisherPruningHook():
         self.conv_names = OrderedDict() # prunable
         self.ln_names = OrderedDict()
         self.name2module = OrderedDict()
+        
+        if self.start_from is not None:
+            load_checkpoint(model, self.start_from)
 
         for n, m in model.named_modules():
             if n: m.name = n
@@ -152,8 +155,6 @@ class FisherPruningHook():
             # divide the conv to several group and all convs in same
             # group used same input at least once in model's
             # forward process.
-            if self.start_from is not None:
-                load_checkpoint(model, self.start_from)
             model.eval()
             self.set_group_masks(model)
             model.train()
