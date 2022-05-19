@@ -544,6 +544,7 @@ class FisherPruningHook():
             module (nn.Module): the module of register hook
         """
         layer_name = type(module).__name__
+        print('hook:',module.name)
         if layer_name in ['Conv2d']:
             n, oc, oh, ow = module.output_size
             ic = module.in_channels
@@ -815,6 +816,7 @@ class FisherPruningHook():
                             x = x[:,m.in_mask.bool(),:,:]
                 output = F.conv2d(x, m.weight, m.bias, m.stride,
                                 m.padding, m.dilation, m.groups)
+                print('mf:',module.name)
                 m.output_size = output.size()
                 return output
             module.forward = MethodType(modified_forward, module) 
