@@ -153,8 +153,6 @@ class FisherPruningHook():
             model.eval()
             self.set_group_masks(model)
             model.train()
-            # outchannel is correlated with inchannel
-            self.construct_outchannel_masks()
             for conv, name in self.conv_names.items():
                 self.conv_inputs[conv] = []
                 # fisher info
