@@ -88,7 +88,7 @@ def main():
             
     # optionally pruning
     if args.prune:
-        hook = FisherPruningHook(pruning=True, resume_from=args.prune)
+        hook = FisherPruningHook(pruning=True, start_from=args.prune)
         hook.before_run(model)
 
     cudnn.benchmark = True

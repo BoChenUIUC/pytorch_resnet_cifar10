@@ -54,6 +54,7 @@ class FisherPruningHook():
         one_shot=False,
         deploy_from=None,
         resume_from=None,
+        start_from=None,
         save_flops_thr=[0.75, 0.5, 0.25],
         save_acts_thr=[0.75, 0.5, 0.25],
     ):
@@ -97,6 +98,7 @@ class FisherPruningHook():
         self.delta = delta
         self.deploy_from = deploy_from
         self.resume_from = resume_from
+        self.start_from = start_from
 
         for i in range(len(save_acts_thr) - 1):
             assert save_acts_thr[i] > save_acts_thr[i + 1]
@@ -150,6 +152,8 @@ class FisherPruningHook():
             # divide the conv to several group and all convs in same
             # group used same input at least once in model's
             # forward process.
+            if self.start_from is not None:
+                load_checkpoint(model, self.start_from)
             model.eval()
             self.set_group_masks(model)
             model.train()
