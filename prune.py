@@ -817,7 +817,7 @@ class FisherPruningHook():
                 output = F.conv2d(x, m.weight, m.bias, m.stride,
                                 m.padding, m.dilation, m.groups)
                 m.output_size = output.size()
-                print('mf:',m.name,m.output_size)
+                print('mf:',m.name,m.output_size,m.kernel_size)
                 return output
             module.forward = MethodType(modified_forward, module) 
         if  type(module).__name__ == 'BatchNorm2d':
