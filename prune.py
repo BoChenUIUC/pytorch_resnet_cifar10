@@ -545,7 +545,7 @@ class FisherPruningHook():
         """
         layer_name = type(module).__name__
         for k in self.flops.keys():
-            print(k,module,k==module)
+            print(type(k),type(module))
         print(module in self.flops.keys())
         if layer_name in ['Conv2d']:
             n, oc, oh, ow = outputs.size()#module.output_size
