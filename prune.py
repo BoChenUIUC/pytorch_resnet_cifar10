@@ -544,9 +544,8 @@ class FisherPruningHook():
             module (nn.Module): the module of register hook
         """
         layer_name = type(module).__name__
-        print('hook:',module.name,outputs.size(),module.test)
         if layer_name in ['Conv2d']:
-            n, oc, oh, ow = module.output_size
+            n, oc, oh, ow = outputs.size()#module.output_size
             ic = module.in_channels
             kh, kw = module.kernel_size
             self.flops[module] += np.prod([n, oc, oh, ow, ic, kh, kw])
@@ -816,9 +815,6 @@ class FisherPruningHook():
                             x = x[:,m.in_mask.bool(),:,:]
                 output = F.conv2d(x, m.weight, m.bias, m.stride,
                                 m.padding, m.dilation, m.groups)
-                m.output_size = output.size()
-                m.test = '???'
-                print('mf:',m.name,m.output_size,m.kernel_size)
                 return output
             module.forward = MethodType(modified_forward, module) 
         if  type(module).__name__ == 'BatchNorm2d':
