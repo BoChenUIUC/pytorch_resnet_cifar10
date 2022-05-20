@@ -544,6 +544,7 @@ class FisherPruningHook():
             module (nn.Module): the module of register hook
         """
         layer_name = type(module).__name__
+        print(self.flops.keys())
         if layer_name in ['Conv2d']:
             n, oc, oh, ow = outputs.size()#module.output_size
             ic = module.in_channels
