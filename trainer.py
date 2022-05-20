@@ -192,6 +192,7 @@ def train(train_loader, model, criterion, optimizer, epoch, hook):
             input_var = input_var.half()
 
         # compute output
+        print(input_var.device)
         output = model(input_var)
         loss = criterion(output, target_var)
 
