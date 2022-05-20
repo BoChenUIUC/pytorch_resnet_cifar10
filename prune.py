@@ -128,8 +128,7 @@ class FisherPruningHook():
             deploy_pruning(model)
             
         if self.start_from is not None:
-            #load_checkpoint(model, self.start_from)
-            pass
+            load_checkpoint(model, self.start_from)
 
     def before_run(self, model):
         """Initialize the relevant variables(fisher, flops and acts) for
@@ -541,6 +540,7 @@ class FisherPruningHook():
         Args:
             module (nn.Module): the module of register hook
         """
+        print(module.name)
         layer_name = type(module).__name__
         if layer_name in ['Conv2d']:
             n, oc, oh, ow = outputs.size()#module.output_size
