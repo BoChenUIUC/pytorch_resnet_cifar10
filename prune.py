@@ -144,10 +144,10 @@ class FisherPruningHook():
             if n: m.name = n
             if self.pruning:
                 self.add_pruning_attrs(m, pruning=self.pruning)
-            if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Linear) or isinstance(m, Bitparm):
+            if isinstance(m, nn.Conv2d):
                 self.conv_names[m] = n
                 self.name2module[n] = m
-            elif isinstance(m, nn.LayerNorm) or isinstance(m, GDN):
+            elif isinstance(m, nn.BatchNorm2d):
                 self.ln_names[m] = n
                 self.name2module[n] = m
 
@@ -158,8 +158,6 @@ class FisherPruningHook():
             model.eval()
             self.set_group_masks(model)
             model.train()
-            # outchannel is correlated with inchannel
-            self.construct_outchannel_masks()
             for conv, name in self.conv_names.items():
                 self.conv_inputs[conv] = []
                 # fisher info
