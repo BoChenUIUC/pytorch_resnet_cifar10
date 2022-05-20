@@ -789,6 +789,7 @@ class FisherPruningHook():
                 module.register_buffer(
                     'soft_mask', torch.nn.Parameter(torch.randn(module.in_channels)).to(module.weight.device))
             def modified_forward(m, x):
+                print(x.device,m.name,m)
                 if self.use_mask:
                     if not m.finetune:
                         if m.trained_mask:
@@ -811,7 +812,6 @@ class FisherPruningHook():
                         # we need to mask it
                         if x.size(1) == len(m.in_mask):
                             x = x[:,m.in_mask.bool(),:,:]
-                print(x.device,m.name,m)
                 output = F.conv2d(x, m.weight, m.bias, m.stride, m.padding, m.dilation, m.groups)
                 return output
             module.forward = MethodType(modified_forward, module) 
