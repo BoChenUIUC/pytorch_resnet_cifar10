@@ -171,6 +171,7 @@ class FisherPruningHook():
                 self.accum_grads[conv] = conv.in_mask.data.new_zeros(len(conv.in_mask))
             for group_id in self.groups:
                 module = self.groups[group_id][0]
+                print(group_id,len(module.in_mask))
                 # fisher info
                 self.temp_fisher_info[group_id] = module.in_mask.data.new_zeros(len(module.in_mask))
                 self.accum_fishers[group_id] = module.in_mask.data.new_zeros(len(module.in_mask))
