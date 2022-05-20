@@ -483,6 +483,7 @@ class FisherPruningHook():
             # impact on group members
             for module in self.groups[group]:
                 # accumulate fisher per channel per batch
+                print(module.name,self.temp_fisher_info[module].size())
                 module_fisher = self.temp_fisher_info[module]
                 self.temp_fisher_info[group] += module_fisher 
                 # accumulate flops per in_channel per batch for each group
