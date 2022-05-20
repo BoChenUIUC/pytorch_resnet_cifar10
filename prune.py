@@ -186,7 +186,7 @@ class FisherPruningHook():
                 load_checkpoint(model, self.resume_from)
             # register forward hook
             for module, name in self.conv_names.items():
-                print('reg',module,id(module),module.device)
+                print('reg',module,id(module),module.weight.device)
                 module.register_forward_hook(self.save_input_forward_hook)
         else:
             load_checkpoint(model, self.deploy_from)
@@ -523,7 +523,7 @@ class FisherPruningHook():
     def init_flops_acts(self):
         """Clear the flops and acts of model in last iter."""
         for module, name in self.conv_names.items():
-            print('init',module,id(module))
+            print('init',module,id(module),module.weight.device)
             self.flops[module] = 0
             self.acts[module] = 0
 
@@ -546,7 +546,7 @@ class FisherPruningHook():
             module (nn.Module): the module of register hook
         """
         layer_name = type(module).__name__
-        print('hook',module,id(module),module.device)
+        print('hook',module,id(module))
         if layer_name in ['Conv2d']:
             n, oc, oh, ow = outputs.size()#module.output_size
             ic = module.in_channels
