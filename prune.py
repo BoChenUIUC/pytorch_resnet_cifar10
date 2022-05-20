@@ -860,12 +860,3 @@ class FisherPruningHook():
                     module.bias = nn.Parameter(module.bias.data[out_mask].data)
                     module.weight.requires_grad = requires_grad
                     module.bias.requires_grad = requires_grad
-
-# to do: make sure linear works fine
-
-if __name__ == '__main__':
-    model = torch.nn.DataParallel(resnet.__dict__['resnet56']())
-    model.cuda(1)
-    for n, m in model.named_modules():
-        print(n,type(m).__name__)
-    
