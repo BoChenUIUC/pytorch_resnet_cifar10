@@ -789,7 +789,6 @@ class FisherPruningHook():
                 module.register_buffer(
                     'soft_mask', torch.nn.Parameter(torch.randn(module.in_channels)).to(module.weight.device))
             def modified_forward(m, x):
-                print(x.device,m.name,m)
                 if self.use_mask:
                     if not m.finetune:
                         if m.trained_mask:

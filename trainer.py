@@ -198,7 +198,7 @@ def train(train_loader, model, criterion, optimizer, epoch, hook):
         # compute gradient and do SGD step
         optimizer.zero_grad()
         loss.backward()
-        if hook is None or not hook.one_shot:
+        if hook is None:
             optimizer.step()
 
         output = output.float()
