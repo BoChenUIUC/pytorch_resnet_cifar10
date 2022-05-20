@@ -811,9 +811,8 @@ class FisherPruningHook():
                         # we need to mask it
                         if x.size(1) == len(m.in_mask):
                             x = x[:,m.in_mask.bool(),:,:]
-                print(x.device,m.name)
-                output = F.conv2d(x, m.weight, m.bias, m.stride,
-                                m.padding, m.dilation, m.groups)
+                print(x.device,m.name,m)
+                output = F.conv2d(x, m.weight, m.bias, m.stride, m.padding, m.dilation, m.groups)
                 return output
             module.forward = MethodType(modified_forward, module) 
         if  type(module).__name__ == 'BatchNorm2d':
