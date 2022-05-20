@@ -811,6 +811,7 @@ class FisherPruningHook():
                         # we need to mask it
                         if x.size(1) == len(m.in_mask):
                             x = x[:,m.in_mask.bool(),:,:]
+                print(x.device,m.weight.device)
                 output = F.conv2d(x, m.weight, m.bias, m.stride,
                                 m.padding, m.dilation, m.groups)
                 return output
