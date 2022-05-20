@@ -723,20 +723,20 @@ class FisherPruningHook():
             if type(m).__name__ not in ['Conv2d','BatchNorm2d']:
                 continue
             # independent nets
-            if 'module.conv1' == n:
+            if 'conv1' == n:
                 ancest_name = []
             elif 'conv' in n:
                 a,b,c = re.findall(r'\d+',n)
                 if c == '1':
                     if b == '0':
                         if a == '1':
-                            ancest_name = ['module.conv1']
+                            ancest_name = ['conv1']
                         else:
-                            ancest_name = ['module.conv1',f'module.layer{int(a)-1}.8.conv2']
+                            ancest_name = ['conv1',f'layer{int(a)-1}.8.conv2']
                     else:
-                        ancest_name = ['module.conv1',f'module.layer{a}.0.conv2']
+                        ancest_name = ['conv1',f'layer{a}.0.conv2']
                 else:
-                    ancest_name = [f'module.layer{a}.{b}.conv1']
+                    ancest_name = [f'layer{a}.{b}.conv1']
 
             if type(m).__name__ in ['Conv2d']:
                 conv2ancest[m] = []
@@ -749,20 +749,20 @@ class FisherPruningHook():
                     ln2ancest[m] += [self.name2module[name]]
                     
             # find child
-            if 'module.conv1' == n or 'module.bn1' == n:
-                m.child = 'module.layer1.0.conv1'
+            if 'conv1' == n or 'bn1' == n:
+                m.child = 'layer1.0.conv1'
             elif 'conv' in n or 'bn' in n:
                 a,b,c = re.findall(r'\d+',n)
                 if c == '1':
-                    m.child = f'module.layer{a}.{b}.conv2'
+                    m.child = f'layer{a}.{b}.conv2'
                 else:
                     if b == '8':
                         if a == '3':
                             pass
                         else:
-                            m.child = f'module.layer{int(a)+1}.0.conv1'
+                            m.child = f'layer{int(a)+1}.0.conv1'
                     else:
-                        m.child = f'module.layer{a}.{int(b)+1}.conv1'
+                        m.child = f'layer{a}.{int(b)+1}.conv1'
             
         self.conv2ancest = conv2ancest
         self.ln2ancest = ln2ancest
