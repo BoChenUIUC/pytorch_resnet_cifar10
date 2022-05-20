@@ -186,7 +186,7 @@ class FisherPruningHook():
                 load_checkpoint(model, self.resume_from)
             # register forward hook
             for module, name in self.conv_names.items():
-                print('reg',module,id(module))
+                print('reg',module,id(module),module.device)
                 module.register_forward_hook(self.save_input_forward_hook)
         else:
             load_checkpoint(model, self.deploy_from)
@@ -546,7 +546,7 @@ class FisherPruningHook():
             module (nn.Module): the module of register hook
         """
         layer_name = type(module).__name__
-        print('hook',module,id(module))
+        print('hook',module,id(module),module.device)
         if layer_name in ['Conv2d']:
             n, oc, oh, ow = outputs.size()#module.output_size
             ic = module.in_channels
