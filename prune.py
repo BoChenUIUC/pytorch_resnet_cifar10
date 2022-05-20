@@ -125,8 +125,11 @@ class FisherPruningHook():
                 if n: m.name = n
                 self.add_pruning_attrs(m, pruning=self.pruning)
             load_checkpoint(model, self.deploy_from)
-            self.deploy_pruning(model)
+            deploy_pruning(model)
             
+        if self.start_from is not None:
+            load_checkpoint(model, self.start_from)
+
     def before_run(self, model):
         """Initialize the relevant variables(fisher, flops and acts) for
         calculating the importance of the channel, and use the layer-grouping
@@ -136,18 +139,15 @@ class FisherPruningHook():
         self.conv_names = OrderedDict() # prunable
         self.ln_names = OrderedDict()
         self.name2module = OrderedDict()
-        
-        if self.start_from is not None:
-            load_checkpoint(model, self.start_from)
 
         for n, m in model.named_modules():
             if n: m.name = n
             if self.pruning:
                 self.add_pruning_attrs(m, pruning=self.pruning)
-            if isinstance(m, nn.Conv2d):
+            if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Linear) or isinstance(m, Bitparm):
                 self.conv_names[m] = n
                 self.name2module[n] = m
-            elif isinstance(m, nn.BatchNorm2d):
+            elif isinstance(m, nn.LayerNorm) or isinstance(m, GDN):
                 self.ln_names[m] = n
                 self.name2module[n] = m
 
@@ -158,6 +158,8 @@ class FisherPruningHook():
             model.eval()
             self.set_group_masks(model)
             model.train()
+            # outchannel is correlated with inchannel
+            self.construct_outchannel_masks()
             for conv, name in self.conv_names.items():
                 self.conv_inputs[conv] = []
                 # fisher info
@@ -186,11 +188,7 @@ class FisherPruningHook():
                 load_checkpoint(model, self.resume_from)
             # register forward hook
             for module, name in self.conv_names.items():
-                print('reg',module,id(module),module.weight.device)
                 module.register_forward_hook(self.save_input_forward_hook)
-        else:
-            load_checkpoint(model, self.deploy_from)
-            self.deploy_pruning(model)
 
         self.print_model(model, print_flops_acts=False, print_channel=False)
 
@@ -523,7 +521,6 @@ class FisherPruningHook():
     def init_flops_acts(self):
         """Clear the flops and acts of model in last iter."""
         for module, name in self.conv_names.items():
-            print('init',module,id(module),module.weight.device)
             self.flops[module] = 0
             self.acts[module] = 0
 
@@ -546,7 +543,6 @@ class FisherPruningHook():
             module (nn.Module): the module of register hook
         """
         layer_name = type(module).__name__
-        print('hook',module,id(module))
         if layer_name in ['Conv2d']:
             n, oc, oh, ow = outputs.size()#module.output_size
             ic = module.in_channels
