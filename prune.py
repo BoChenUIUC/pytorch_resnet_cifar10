@@ -128,7 +128,8 @@ class FisherPruningHook():
             deploy_pruning(model)
             
         if self.start_from is not None:
-            load_checkpoint(model, self.start_from)
+            #load_checkpoint(model, self.start_from)
+            pass
 
     def before_run(self, model):
         """Initialize the relevant variables(fisher, flops and acts) for
