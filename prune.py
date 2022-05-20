@@ -636,6 +636,7 @@ class FisherPruningHook():
 
         layer_name = type(module).__name__
         weight = module.weight
+        print('comp',module.name,self.temp_fisher_info[module].size())
         self.temp_fisher_info[module] += compute_fisher(weight, weight.grad, layer_name)
         self.temp_mag_info[module] += compute_mag(weight, weight.grad, layer_name)
         self.temp_grad_info[module] += compute_grad(weight, weight.grad, layer_name)
