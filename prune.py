@@ -171,7 +171,6 @@ class FisherPruningHook():
                 self.accum_grads[conv] = conv.in_mask.data.new_zeros(len(conv.in_mask))
             for group_id in self.groups:
                 module = self.groups[group_id][0]
-                print(group_id,len(module.in_mask))
                 # fisher info
                 self.temp_fisher_info[group_id] = module.in_mask.data.new_zeros(len(module.in_mask))
                 self.accum_fishers[group_id] = module.in_mask.data.new_zeros(len(module.in_mask))
@@ -706,6 +705,12 @@ class FisherPruningHook():
         self.group_modules = []
         for group in self.groups:
             self.group_modules.extend(self.groups[group])
+            
+        self.conv_names_group = [[item.name for item in v]
+                                 for idx, v in self.groups.items()]
+        for g in self.conv_names_group:
+            print(g)
+        exit(0)
 
     def find_module_ancestors(self, model):
         """find the nearest module
