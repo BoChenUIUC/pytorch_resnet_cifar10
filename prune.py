@@ -186,7 +186,7 @@ class FisherPruningHook():
                 load_checkpoint(model, self.resume_from)
             # register forward hook
             for module, name in self.conv_names.items():
-                print('reg',name,id(module))
+                print('reg',module,id(module))
                 module.register_forward_hook(self.save_input_forward_hook)
         else:
             load_checkpoint(model, self.deploy_from)
@@ -523,7 +523,7 @@ class FisherPruningHook():
     def init_flops_acts(self):
         """Clear the flops and acts of model in last iter."""
         for module, name in self.conv_names.items():
-            print('init',name,id(module))
+            print('init',module,id(module))
             self.flops[module] = 0
             self.acts[module] = 0
 
