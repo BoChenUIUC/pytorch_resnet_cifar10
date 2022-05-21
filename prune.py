@@ -660,7 +660,7 @@ class FisherPruningHook():
                     groups_ancest[group] = list(
                         module_ancest.union(group_ancest))
                     added = True
-                    print(module.name,group)
+                    print(module.name,group,)
                     break
             if not added:
                 idx += 1
@@ -741,16 +741,16 @@ class FisherPruningHook():
                         if a == '1':
                             ancest_name = ['conv1']
                         elif a == '2':
-                            ancest_name = ['conv1','layer1.8.conv2']
+                            ancest_name = ['layer1.8.conv2']
                         else:
-                            ancest_name = ['layer2.0.conv2','layer2.8.conv2']
+                            ancest_name = ['layer2.8.conv2']
                     else:
                         if a == '1':
-                            ancest_name = ['conv1',f'layer1.{int(b)-1}.conv2']
+                            ancest_name = ['layer1.0.conv2',f'layer1.{int(b)-1}.conv2']
                         elif a == '2':
-                            ancest_name = ['layer1.8.conv2',f'layer2.{int(b)-1}.conv2']
+                            ancest_name = ['layer2.0.conv2',f'layer2.{int(b)-1}.conv2']
                         else:
-                            ancest_name = ['layer2.8.conv2',f'layer3.{int(b)-1}.conv2']
+                            ancest_name = ['layer3.0.conv2',f'layer3.{int(b)-1}.conv2']
                 else:
                     ancest_name = [f'layer{a}.{b}.conv1']
             print(n,ancest_name)
