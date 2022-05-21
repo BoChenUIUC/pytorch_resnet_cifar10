@@ -276,6 +276,7 @@ class FisherPruningHook():
                     chans_o = module.out_channels
                 print('{}: input_channels: {}/{}, out_channels: {}/{}'.format(
                         name, chans_i, len(module.in_mask), chans_o, len(child.in_mask)))
+                print(module.weight.size())
             for module, name in self.ln_names.items():
                 if hasattr(module, 'child'):
                     child = self.name2module[module.child]
