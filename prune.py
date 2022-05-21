@@ -226,8 +226,6 @@ class FisherPruningHook():
                 sns.displot(self.grad_list, kind='hist', aspect=1.2)
                 plt.savefig(f'metrics/dist_grad_{self.iter}_{int(self.total_flops*100):4d}_{int(self.total_acts*100):4d}_{loss:.4f}.png')
                 self.iter += 1
-                if self.iter>=30:
-                    exit(0)
         self.init_flops_acts()
 
     def update_flop_act(self, model, work_dir='work_dir/'):
@@ -792,7 +790,7 @@ class FisherPruningHook():
         """
         # same group same softmask
         module.trained_mask = self.trained_mask
-        limit = float(1e-4)
+        limit = float(1e-2)
         module.noise_mask = self.noise_mask
         module.finetune = not pruning
         if type(module).__name__ == 'Conv2d':
@@ -813,8 +811,9 @@ class FisherPruningHook():
                             mask = mask.view(1,-1,1,1)
                             x = x * mask.to(x.device)
                         elif m.noise_mask:
-                            mask = m.in_mask.view(1,-1,1,1).to(x.device)
-                            noise = torch.empty_like(x).uniform_(-limit, limit)*mask
+                            #mask = m.in_mask.view(1,-1,1,1).to(x.device)
+                            noise_scale = 0.95**torch.arange(module.in_channels).view(1,-1,1,1).to(x.device)
+                            noise = torch.empty_like(x).uniform_(-limit, limit)*noise_scale
                             x = x + noise
                         else:
                             mask = m.in_mask.view(1,-1,1,1)

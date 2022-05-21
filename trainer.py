@@ -88,7 +88,7 @@ def main():
             
     # optionally pruning
     if args.prune:
-        hook = FisherPruningHook(pruning=True, start_from=args.prune)
+        hook = FisherPruningHook(pruning=True, noise_mask=True, start_from=args.prune)
         hook.after_build_model(model)
         hook.before_run(model)
 
@@ -198,8 +198,7 @@ def train(train_loader, model, criterion, optimizer, epoch, hook):
         # compute gradient and do SGD step
         optimizer.zero_grad()
         loss.backward()
-        if hook is None:
-            optimizer.step()
+        optimizer.step()
 
         output = output.float()
         loss = loss.float()
