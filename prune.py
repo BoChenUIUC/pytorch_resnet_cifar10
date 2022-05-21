@@ -739,10 +739,17 @@ class FisherPruningHook():
                     if b == '0':
                         if a == '1':
                             ancest_name = ['conv1']
+                        elif a == '2':
+                            ancest_name = ['conv1','layer1.8.conv2']
                         else:
-                            ancest_name = ['conv1',f'layer{int(a)-1}.8.conv2']
+                            ancest_name = ['layer2.0.conv2','layer2.8.conv2']
                     else:
-                        ancest_name = ['conv1',f'layer{a}.0.conv2']
+                        if a == '1':
+                            ancest_name = ['conv1',f'layer1.{int(b)-1}.conv2']
+                        elif a == '2':
+                            ancest_name = ['layer1.8.conv2',f'layer2.{int(b)-1}.conv2']
+                        else:
+                            ancest_name = ['layer2.8.conv2',f'layer3.{int(b)-1}.conv2']
                 else:
                     ancest_name = [f'layer{a}.{b}.conv1']
 
