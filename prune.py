@@ -660,13 +660,11 @@ class FisherPruningHook():
                     groups_ancest[group] = list(
                         module_ancest.union(group_ancest))
                     added = True
-                    print(module.name,group,)
                     break
             if not added:
                 idx += 1
                 groups[idx] = [module]
                 groups_ancest[idx] = self.conv2ancest[module]
-                print(module.name,idx)
         # key is the ids the group, and value contains all conv
         # of this group
         self.groups = {}
@@ -711,9 +709,9 @@ class FisherPruningHook():
             
         self.conv_names_group = [[item.name for item in v]
                                  for idx, v in self.groups.items()]
-        for g in self.conv_names_group:
-            print(g)
-        exit(0)
+        #for g in self.conv_names_group:
+        #    print(g)
+        #exit(0)
 
     def find_module_ancestors(self, model):
         """find the nearest module
@@ -753,7 +751,6 @@ class FisherPruningHook():
                             ancest_name = ['layer3.0.conv2',f'layer3.{int(b)-1}.conv2']
                 else:
                     ancest_name = [f'layer{a}.{b}.conv1']
-            print(n,ancest_name)
 
             if type(m).__name__ in ['Conv2d']:
                 conv2ancest[m] = []
