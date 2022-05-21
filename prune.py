@@ -188,7 +188,7 @@ class FisherPruningHook():
             for module, name in self.conv_names.items():
                 module.register_forward_hook(self.save_input_forward_hook)
 
-        self.print_model(model, print_flops_acts=False, print_channel=True)
+        self.print_model(model, print_flops_acts=False, print_channel=False)
 
     def after_backward(self, itr, model, loss):
         if not self.pruning:
@@ -276,7 +276,6 @@ class FisherPruningHook():
                     chans_o = module.out_channels
                 print('{}: input_channels: {}/{}, out_channels: {}/{}'.format(
                         name, chans_i, len(module.in_mask), chans_o, len(child.in_mask)))
-                print(module.weight.size())
             for module, name in self.ln_names.items():
                 if hasattr(module, 'child'):
                     child = self.name2module[module.child]
