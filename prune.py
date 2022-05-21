@@ -790,12 +790,15 @@ class FisherPruningHook():
         """
         # same group same softmask
         module.trained_mask = self.trained_mask
-        limit = float(1)
+        limit = float(100)
         module.noise_mask = self.noise_mask
         module.finetune = not pruning
         if type(module).__name__ == 'Conv2d':
+            all_ones = module.weight.new_ones((module.in_channels,)
+            half_ones_zeros = module.weight.new_ones(module.in_channels)
+            half_ones_zeros[module.in_channels//2:] = 0
             module.register_buffer(
-                'in_mask', module.weight.new_ones((module.in_channels,), ))
+                'in_mask', half_ones_zeros, ))
             if self.trained_mask:
                 module.register_buffer(
                     'soft_mask', torch.nn.Parameter(torch.randn(module.in_channels)).to(module.weight.device))
@@ -811,11 +814,8 @@ class FisherPruningHook():
                             mask = mask.view(1,-1,1,1)
                             x = x * mask.to(x.device)
                         elif m.noise_mask:
-                            #mask = m.in_mask.view(1,-1,1,1).to(x.device)
-                            half_ones_zeros = torch.ones(module.in_channels)
-                            half_ones_zeros[module.in_channels//2:] = 0
-                            noise_scale = half_ones_zeros.view(1,-1,1,1).to(x.device)
-                            noise = torch.empty_like(x).uniform_(-limit, limit)*noise_scale
+                            mask = m.in_mask.view(1,-1,1,1).to(x.device)
+                            noise = torch.empty_like(x).uniform_(-limit, limit)*mask
                             x = x + noise
                         else:
                             mask = m.in_mask.view(1,-1,1,1)
