@@ -751,6 +751,7 @@ class FisherPruningHook():
                             ancest_name = ['layer2.8.conv2',f'layer3.{int(b)-1}.conv2']
                 else:
                     ancest_name = [f'layer{a}.{b}.conv1']
+            print(n,ancest_name)
 
             if type(m).__name__ in ['Conv2d']:
                 conv2ancest[m] = []
