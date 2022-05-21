@@ -212,7 +212,7 @@ class FisherPruningHook():
                 self.fisher_list[self.fisher_list==0] = 1e-50
                 self.fisher_list = torch.log10(self.fisher_list).detach().cpu().numpy()
                 sns.displot(self.fisher_list, kind='hist', aspect=1.2)
-                plt.savefig(f'metrics/dist_fisher_{self.iter}_{int(self.total_flops*100):3d}_{int(self.total_acts*100):3d}_{loss:.2f}.png')
+                plt.savefig(f'metrics/dist_fisher_{self.iter}_{int(self.total_flops*100):4d}_{int(self.total_acts*100):4d}_{loss:.4f}.png')
                 #plt.savefig(f'metrics/dist_fisher_{self.iter}_{loss:.2f}.png')
                 # magnitude
                 #plt.figure(2)
