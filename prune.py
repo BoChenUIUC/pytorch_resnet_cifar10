@@ -226,6 +226,8 @@ class FisherPruningHook():
                 sns.displot(self.grad_list, kind='hist', aspect=1.2)
                 plt.savefig(f'fisher/dist_grad_{self.iter}_{int(self.total_flops*100):4d}_{int(self.total_acts*100):4d}_{loss:.4f}.png')
                 self.iter += 1
+                if self.iter>=30:
+                    exit(0)
         self.init_flops_acts()
 
     def update_flop_act(self, model, work_dir='work_dir/'):
