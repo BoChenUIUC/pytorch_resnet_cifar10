@@ -213,20 +213,18 @@ class FisherPruningHook():
                 self.fisher_list = torch.log10(self.fisher_list).detach().cpu().numpy()
                 sns.displot(self.fisher_list, kind='hist', aspect=1.2)
                 plt.savefig(f'metrics/dist_fisher_{self.iter}_{int(self.total_flops*100):4d}_{int(self.total_acts*100):4d}_{loss:.4f}.png')
-                #plt.savefig(f'metrics/dist_fisher_{self.iter}_{loss:.2f}.png')
                 # magnitude
-                #plt.figure(2)
-                #self.mag_list[self.mag_list==0] = 1e-50
-                #self.mag_list = torch.log10(self.mag_list).detach().cpu().numpy()
-                #sns.displot(self.mag_list, kind='hist', aspect=1.2)
-                #plt.savefig(f'fisher/dist_mag_{int(self.total_flops*100):3d}_{int(self.total_acts*100):3d}_{loss:.2f}.png')
-                #plt.savefig(f'fisher/dist_mag_{self.iter}_{loss:.2f}.png')
+                plt.figure(2)
+                self.mag_list[self.mag_list==0] = 1e-50
+                self.mag_list = torch.log10(self.mag_list).detach().cpu().numpy()
+                sns.displot(self.mag_list, kind='hist', aspect=1.2)
+                plt.savefig(f'fisher/dist_mag_{self.iter}_{int(self.total_flops*100):4d}_{int(self.total_acts*100):4d}_{loss:.4f}.png')
                 # gradient
-                #plt.figure(3)
-                #self.grad_list[self.grad_list==0] = 1e-50
-                #self.grad_list = torch.log10(self.grad_list).detach().cpu().numpy()
-                #sns.displot(self.grad_list, kind='hist', aspect=1.2)
-                #plt.savefig(f'fisher/dist_grad_{self.iter}_{loss:.2f}.png')
+                plt.figure(3)
+                self.grad_list[self.grad_list==0] = 1e-50
+                self.grad_list = torch.log10(self.grad_list).detach().cpu().numpy()
+                sns.displot(self.grad_list, kind='hist', aspect=1.2)
+                plt.savefig(f'fisher/dist_grad_{self.iter}_{int(self.total_flops*100):4d}_{int(self.total_acts*100):4d}_{loss:.4f}.png')
                 self.iter += 1
         self.init_flops_acts()
 
