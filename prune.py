@@ -796,7 +796,7 @@ class FisherPruningHook():
         if type(module).__name__ == 'Conv2d':
             all_ones = module.weight.new_ones(module.in_channels,)
             half_ones_zeros = module.weight.new_ones(module.in_channels)
-            half_ones_zeros[module.in_channels//2:] = 0
+            half_ones_zeros[:module.in_channels//2] = 0
             module.register_buffer('in_mask', half_ones_zeros)
             if self.trained_mask:
                 module.register_buffer(
