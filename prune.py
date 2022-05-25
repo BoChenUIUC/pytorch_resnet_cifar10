@@ -797,7 +797,10 @@ class FisherPruningHook():
             all_ones = module.weight.new_ones(module.in_channels,)
             half_ones_zeros = module.weight.new_ones(module.in_channels)
             half_ones_zeros[:module.in_channels//2] = 0
-            module.register_buffer('in_mask', half_ones_zeros)
+            tricut = module.weight.new_ones(module.in_channels)
+            tricut[module.in_channels//3:module.in_channels*2//3] = 1e-2
+            tricut[module.in_channels*2//3:] = 1e-4
+            module.register_buffer('in_mask', tricut)
             if self.trained_mask:
                 module.register_buffer(
                     'soft_mask', torch.nn.Parameter(torch.randn(module.in_channels)).to(module.weight.device))
