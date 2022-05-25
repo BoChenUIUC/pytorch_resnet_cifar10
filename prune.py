@@ -798,8 +798,8 @@ class FisherPruningHook():
             half_ones_zeros = module.weight.new_ones(module.in_channels)
             half_ones_zeros[:module.in_channels//2] = 0
             tricut = module.weight.new_ones(module.in_channels)
-            tricut[module.in_channels//3:module.in_channels*2//3] = 1e-2
-            tricut[module.in_channels*2//3:] = 1e-4
+            tricut[module.in_channels//3:module.in_channels*2//3] = 1e-1
+            tricut[module.in_channels*2//3:] = 1e-2
             module.register_buffer('in_mask', tricut)
             if self.trained_mask:
                 module.register_buffer(
