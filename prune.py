@@ -790,17 +790,18 @@ class FisherPruningHook():
         """
         # same group same softmask
         module.trained_mask = self.trained_mask
-        limit = float(1)
+        limit = float(100)
         module.noise_mask = self.noise_mask
         module.finetune = not pruning
         if type(module).__name__ == 'Conv2d':
             all_ones = module.weight.new_ones(module.in_channels,)
             half_ones_zeros = module.weight.new_ones(module.in_channels)
             half_ones_zeros[:module.in_channels//2] = 0
-            tricut = module.weight.new_ones(module.in_channels)
-            tricut[module.in_channels//3:module.in_channels*2//3] = 1e-2
-            tricut[module.in_channels*2//3:] = 1e-4
-            module.register_buffer('in_mask', tricut)
+            mcut = module.weight.new_ones(module.in_channels)
+            mcut[module.in_channels//4:module.in_channels//2] = 1e-2
+            mcut[module.in_channels//2:module.in_channels*3//4] = 1e-4
+            mcut[module.in_channels*3//4:] = 1e-6
+            module.register_buffer('in_mask', mcut)
             if self.trained_mask:
                 module.register_buffer(
                     'soft_mask', torch.nn.Parameter(torch.randn(module.in_channels)).to(module.weight.device))
