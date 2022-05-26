@@ -795,12 +795,12 @@ class FisherPruningHook():
         module.finetune = not pruning
         if type(module).__name__ == 'Conv2d':
             all_ones = module.weight.new_ones(module.in_channels,)
-            half_ones_zeros = module.weight.new_ones(module.in_channels)
-            half_ones_zeros[:module.in_channels//2] = 0
+            num_splits,mult = 5,1
+            delta_channels = module.in_channels//num_splits
             mcut = module.weight.new_ones(module.in_channels)
-            mcut[module.in_channels//4:module.in_channels//2] = 1e-2
-            mcut[module.in_channels//2:module.in_channels*3//4] = 1e-4
-            mcut[module.in_channels*3//4:] = 1e-6
+            for k in range(num_splits):
+                mcut[k*delta_channels:(k+1)*delta_channels] = mult
+                mult *= 1e-2
             module.register_buffer('in_mask', mcut)
             if self.trained_mask:
                 module.register_buffer(
