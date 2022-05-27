@@ -467,7 +467,7 @@ class FisherPruningHook():
     def add_noise_mask(self):
         sorted, indices = self.fisher_list.sort(dim=0)
         
-        num_groups,mult,noise_decay = 3,1,1e-2
+        num_groups,mult,noise_decay = 4,1,1e-2
         split_size = len(self.fisher_list)//num_groups + 1
         ind_groups = torch.split(indices, split_size)
         noise_scale = torch.ones_like(self.fisher_list).float()
@@ -823,7 +823,7 @@ class FisherPruningHook():
         module.finetune = not pruning
         if type(module).__name__ == 'Conv2d':
             all_ones = module.weight.new_ones(module.in_channels,)
-            mx_range = float(10)
+            mx_range = float(100)
             module.register_buffer('in_mask', all_ones)
             if self.trained_mask:
                 module.register_buffer(
