@@ -790,17 +790,16 @@ class FisherPruningHook():
         """
         # same group same softmask
         module.trained_mask = self.trained_mask
-        limit = float(100)
         module.noise_mask = self.noise_mask
         module.finetune = not pruning
         if type(module).__name__ == 'Conv2d':
             all_ones = module.weight.new_ones(module.in_channels,)
-            num_splits,mult = 5,1
+            num_splits,mult = 8,float(1)
             delta_channels = module.in_channels//num_splits
             mcut = module.weight.new_ones(module.in_channels)
             for k in range(num_splits):
                 mcut[k*delta_channels:(k+1)*delta_channels] = mult
-                mult *= 1e-2
+                mult *= 2
             module.register_buffer('in_mask', mcut)
             if self.trained_mask:
                 module.register_buffer(
@@ -818,7 +817,7 @@ class FisherPruningHook():
                             x = x * mask.to(x.device)
                         elif m.noise_mask:
                             mask = m.in_mask.view(1,-1,1,1).to(x.device)
-                            noise = torch.empty_like(x).uniform_(-limit, limit)*mask
+                            noise = torch.empty_like(x).uniform_(-1., 1.)*mask
                             x = x + noise
                         else:
                             mask = m.in_mask.view(1,-1,1,1)
