@@ -795,12 +795,12 @@ class FisherPruningHook():
         if type(module).__name__ == 'Conv2d':
             all_ones = module.weight.new_ones(module.in_channels,)
             mx_range = float(10)
-            num_splits,mult = 8,1
+            num_splits,mult = 3,1
             delta_channels = module.in_channels//num_splits
             mcut = module.weight.new_ones(module.in_channels)
             for k in range(num_splits):
                 mcut[k*delta_channels:(k+1)*delta_channels] = mult
-                mult *= 0.5
+                mult *= 1e-2
             module.register_buffer('in_mask', mcut)
             if self.trained_mask:
                 module.register_buffer(
