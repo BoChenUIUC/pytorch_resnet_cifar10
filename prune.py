@@ -470,7 +470,7 @@ class FisherPruningHook():
         num_groups,mult,noise_decay = 3,1,1e-2
         split_size = len(self.fisher_list)//num_groups + 1
         ind_groups = torch.split(indices, split_size)
-        noise_scale = torch.ones_like(self.fisher_list).double()
+        noise_scale = torch.ones_like(self.fisher_list).float()
         for ind_group in ind_groups:
             noise_scale[ind_group] = mult
             mult *= 1e-2
