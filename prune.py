@@ -421,6 +421,8 @@ class FisherPruningHook():
     def channel_prune(self):
         """Select the channel in model with smallest fisher / delta set
         corresponding in_mask 0."""
+        
+        # order channels so that noise can be added accordingly
 
         info = {'module': None, 'channel': None, 'min': 1e15}
         self.fisher_list = torch.tensor([]).cuda()
@@ -448,8 +450,10 @@ class FisherPruningHook():
             info.update(self.find_pruning_channel(group, fisher, in_mask, info))
                 
         module, channel = info['module'], info['channel']
-        if self.trained_mask or self.noise_mask:
+        if self.trained_mask:
             pass
+        elif self.noise_mask:
+            self.add_noise_mask()
         else:
             # only modify in_mask is sufficient
             if isinstance(module, int):
@@ -459,6 +463,31 @@ class FisherPruningHook():
             elif module is not None:
                 # the case for single module
                 module.in_mask[channel] = 0
+    
+    def add_noise_mask(self):
+        sorted, indices = self.fisher_list.sort(dim=0)
+        
+        num_groups,mult,noise_decay = 3,1,1e-2
+        split_size = len(self.fisher_list)//num_groups + 1
+        ind_groups = torch.split(indices, split_size)
+        noise_scale = torch.ones_like(self.fisher_list).double()
+        for ind_group in ind_groups:
+            noise_scale[ind_group] = mult
+            mult *= 1e-2
+            
+        mask_start = 0
+        for module, name in self.conv_names.items():
+            if exclude is not None and module in exclude:
+                continue
+            mask_len = len(module.in_mask.view(-1))
+            module.in_mask = noise_scale[mask_start:mask_start+mask_len]
+            mask_start += mask_len
+                
+        for group in self.groups:
+            mask_len = len(self.groups[group][0].in_mask.view(-1))
+            for module in self.groups[group]:
+                module.in_mask = noise_scale[mask_start:mask_start+mask_len]
+            mask_start += mask_len
             
     def accumulate_fishers(self):
         """Accumulate all the fisher during self.interval iterations."""
@@ -795,13 +824,7 @@ class FisherPruningHook():
         if type(module).__name__ == 'Conv2d':
             all_ones = module.weight.new_ones(module.in_channels,)
             mx_range = float(10)
-            num_splits,mult = 3,1
-            delta_channels = module.in_channels//num_splits
-            mcut = module.weight.new_ones(module.in_channels)
-            for k in range(num_splits):
-                mcut[k*delta_channels:(k+1)*delta_channels] = mult
-                mult *= 5e-2
-            module.register_buffer('in_mask', mcut)
+            module.register_buffer('in_mask', all_ones)
             if self.trained_mask:
                 module.register_buffer(
                     'soft_mask', torch.nn.Parameter(torch.randn(module.in_channels)).to(module.weight.device))
