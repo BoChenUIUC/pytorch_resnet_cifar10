@@ -477,7 +477,7 @@ class FisherPruningHook():
             
         mask_start = 0
         for module, name in self.conv_names.items():
-            if exclude is not None and module in exclude:
+            if self.group_modules is not None and module in self.group_modules:
                 continue
             mask_len = len(module.in_mask.view(-1))
             module.in_mask = noise_scale[mask_start:mask_start+mask_len]
