@@ -473,7 +473,7 @@ class FisherPruningHook():
         noise_scale = torch.ones_like(self.fisher_list).float()
         for ind_group in ind_groups:
             noise_scale[ind_group] = mult
-            mult *= 1e-2
+            mult *= noise_decay
             
         mask_start = 0
         for module, name in self.conv_names.items():
