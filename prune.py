@@ -823,7 +823,7 @@ class FisherPruningHook():
         module.finetune = not pruning
         if type(module).__name__ == 'Conv2d':
             all_ones = module.weight.new_ones(module.in_channels,)
-            mx_range = float(100)
+            mx_range = float(1)
             module.register_buffer('in_mask', all_ones)
             if self.trained_mask:
                 module.register_buffer(
@@ -844,7 +844,7 @@ class FisherPruningHook():
                             # uniform noise
                             #noise = torch.empty_like(x).uniform_(-mx_range, mx_range)*mask
                             # normal noise
-                            noise = torch.empty_like(x).normal_(std=0.1)*mx_range*mask
+                            noise = torch.empty_like(x).normal_(std=100)*mx_range*mask
                             x = x + noise
                         else:
                             mask = m.in_mask.view(1,-1,1,1)
