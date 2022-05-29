@@ -467,7 +467,7 @@ class FisherPruningHook():
     def add_noise_mask(self):
         sorted, indices = self.fisher_list.sort(dim=0)
         
-        num_groups,mult,noise_decay = 4,1,1e-2
+        num_groups,mult,noise_decay = 4,1,1e-1
         split_size = len(self.fisher_list)//num_groups + 1
         ind_groups = torch.split(indices, split_size)
         noise_scale = torch.ones_like(self.fisher_list).float()
@@ -844,7 +844,7 @@ class FisherPruningHook():
                             # uniform noise
                             #noise = torch.empty_like(x).uniform_(-mx_range, mx_range)*mask
                             # normal noise
-                            noise = torch.empty_like(x).normal_(std=100)*mx_range*mask
+                            noise = torch.empty_like(x).normal_(std=mx_range)*mask
                             x = x + noise
                         else:
                             mask = m.in_mask.view(1,-1,1,1)
