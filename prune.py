@@ -508,7 +508,7 @@ class FisherPruningHook():
             for module in self.groups[group]:
                 p = torch.pow(module.weight,2).sum()
                 total_penalty += p
-        total_penalty *= 1e-4
+        total_penalty *= 1e-6
         return total_penalty
             
     def accumulate_fishers(self):
