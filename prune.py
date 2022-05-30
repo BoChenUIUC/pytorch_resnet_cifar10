@@ -823,7 +823,7 @@ class FisherPruningHook():
         module.finetune = not pruning
         if type(module).__name__ == 'Conv2d':
             all_ones = module.weight.new_ones(module.in_channels,)
-            mx_range = float(10)
+            mx_range = float(100)
             module.register_buffer('in_mask', all_ones)
             if self.trained_mask:
                 module.register_buffer(
