@@ -465,6 +465,7 @@ class FisherPruningHook():
                 module.in_mask[channel] = 0
     
     def add_noise_mask(self):
+        return
         sorted, indices = self.fisher_list.sort(dim=0)
         
         num_groups,mult,noise_decay = 4,1,1e-3
