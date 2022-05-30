@@ -845,7 +845,7 @@ class FisherPruningHook():
                             #noise = torch.empty_like(x).uniform_(-mx_range, mx_range)*mask
                             # normal noise
                             noise = torch.empty_like(x).normal_(std=mx_range)*mask
-                            x = x + noise
+                            #x = x + noise
                         else:
                             mask = m.in_mask.view(1,-1,1,1)
                             x = x * mask.to(x.device)
