@@ -494,21 +494,19 @@ class FisherPruningHook():
             
     def mag_penalty(self):
         # try negative and different factors
-        total_penalty = None
+        weight_list = None
         for module, name in self.conv_names.items():
             if self.group_modules is not None and module in self.group_modules:
                 continue
-            p = torch.pow(module.weight,2).sum()
-            if total_penalty is None:
-                total_penalty = p
+            if weight_list is None:
+                weight_list = module.weight.view(-1)
             else:
-                total_penalty += p
+                weight_list = torch.cat((weight_list,module.weight.view(-1)))
         for group in self.groups:
             mask_len = len(self.groups[group][0].in_mask.view(-1))
             for module in self.groups[group]:
-                p = torch.pow(module.weight,2).sum()
-                total_penalty += p
-        total_penalty *= 1e-6
+                weight_list = torch.cat((weight_list,module.weight.view(-1)))
+        total_penalty = 1e-4 * torch.norm(weight_list,p=2)
         return total_penalty
             
     def accumulate_fishers(self):
