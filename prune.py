@@ -63,6 +63,7 @@ class FisherPruningHook():
         self.pruning = pruning
         self.trained_mask = trained_mask
         self.noise_mask = noise_mask
+        self.use_penalty = True
         self.delta = delta
         self.interval = interval
         # The key of self.input is conv module, and value of it
@@ -212,7 +213,7 @@ class FisherPruningHook():
                 self.fisher_list[self.fisher_list==0] = 1e-50
                 self.fisher_list = torch.log10(self.fisher_list).detach().cpu().numpy()
                 sns.displot(self.fisher_list, kind='hist', aspect=1.2)
-                plt.savefig(f'metrics/dist_fisher_{self.iter}_{int(self.total_flops*100):4d}_{int(self.total_acts*100):4d}_{loss:.4f}.png')
+                plt.savefig(f'metrics/dist_fisher_{self.iter}_{loss:.4f}.png')
                 # magnitude
                 #plt.figure(2)
                 #self.mag_list[self.mag_list==0] = 1e-50
@@ -465,7 +466,8 @@ class FisherPruningHook():
                 module.in_mask[channel] = 0
     
     def add_noise_mask(self):
-        return
+        if self.use_penalty:
+            return
         sorted, indices = self.fisher_list.sort(dim=0)
         
         num_groups,mult,noise_decay = 4,1,1e-3
@@ -489,6 +491,25 @@ class FisherPruningHook():
             for module in self.groups[group]:
                 module.in_mask = noise_scale[mask_start:mask_start+mask_len]
             mask_start += mask_len
+            
+    def mag_penalty(self):
+        # try negative and different factors
+        total_penalty = None
+        for module, name in self.conv_names.items():
+            if self.group_modules is not None and module in self.group_modules:
+                continue
+            p = torch.pow(module.weight,2).sum()
+            if total_penalty is None:
+                total_penalty = p
+            else:
+                total_penalty += p
+        for group in self.groups:
+            mask_len = len(self.groups[group][0].in_mask.view(-1))
+            for module in self.groups[group]:
+                p = torch.pow(module.weight,2).sum()
+                total_penalty += p
+        total_penalty *= 1e-4
+        return total_penalty
             
     def accumulate_fishers(self):
         """Accumulate all the fisher during self.interval iterations."""
@@ -841,12 +862,10 @@ class FisherPruningHook():
                             mask = mask.view(1,-1,1,1)
                             x = x * mask.to(x.device)
                         elif m.noise_mask:
-                            mask = m.in_mask.view(1,-1,1,1).to(x.device)
-                            # uniform noise
-                            #noise = torch.empty_like(x).uniform_(-mx_range, mx_range)*mask
-                            # normal noise
-                            noise = torch.empty_like(x).normal_(std=mx_range)*mask
-                            #x = x + noise
+                            if not self.use_penalty:
+                                mask = m.in_mask.view(1,-1,1,1).to(x.device)
+                                noise = torch.empty_like(x).normal_(std=mx_range)*mask
+                                x = x + noise
                         else:
                             mask = m.in_mask.view(1,-1,1,1)
                             x = x * mask.to(x.device)
