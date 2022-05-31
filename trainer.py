@@ -194,8 +194,8 @@ def train(train_loader, model, criterion, optimizer, epoch, hook):
         # compute output
         output = model(input_var)
         loss = criterion(output, target_var)
-        if hook.use_penalty:
-            loss += hook.mag_penalty()
+        #if hook.use_penalty:
+        #    loss += hook.mag_penalty()
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
