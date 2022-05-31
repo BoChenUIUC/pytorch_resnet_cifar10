@@ -216,7 +216,7 @@ def train(train_loader, model, criterion, optimizer, epoch, hook):
         # if pruning
         if hook is not None:
             # backward the regularization function
-            hook.after_backward(i, model, losses.avg)
+            hook.after_backward(i, model, top1.avg)
 
         if i % args.print_freq == 0:
             if hook is not None:
