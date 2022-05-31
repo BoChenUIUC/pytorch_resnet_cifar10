@@ -215,17 +215,17 @@ class FisherPruningHook():
                 sns.displot(self.fisher_list, kind='hist', aspect=1.2)
                 plt.savefig(f'metrics/dist_fisher_{self.iter}_{loss:.3f}.png')
                 # magnitude
-                #plt.figure(2)
-                #self.mag_list[self.mag_list==0] = 1e-50
-                #self.mag_list = torch.log10(self.mag_list).detach().cpu().numpy()
-                #sns.displot(self.mag_list, kind='hist', aspect=1.2)
-                #plt.savefig(f'metrics/dist_mag_{self.iter}_{int(self.total_flops*100):4d}_{int(self.total_acts*100):4d}_{loss:.4f}.png')
+                plt.figure(2)
+                self.mag_list[self.mag_list==0] = 1e-50
+                self.mag_list = torch.log10(self.mag_list).detach().cpu().numpy()
+                sns.displot(self.mag_list, kind='hist', aspect=1.2)
+                plt.savefig(f'metrics/dist_mag_{self.iter}.png')
                 # gradient
-                #plt.figure(3)
-                #self.grad_list[self.grad_list==0] = 1e-50
-                #self.grad_list = torch.log10(self.grad_list).detach().cpu().numpy()
-                #sns.displot(self.grad_list, kind='hist', aspect=1.2)
-                #plt.savefig(f'metrics/dist_grad_{self.iter}_{int(self.total_flops*100):4d}_{int(self.total_acts*100):4d}_{loss:.4f}.png')
+                plt.figure(3)
+                self.grad_list[self.grad_list==0] = 1e-50
+                self.grad_list = torch.log10(self.grad_list).detach().cpu().numpy()
+                sns.displot(self.grad_list, kind='hist', aspect=1.2)
+                plt.savefig(f'metrics/dist_grad_{self.iter}.png')
                 self.iter += 1
         self.init_flops_acts()
 
@@ -470,7 +470,7 @@ class FisherPruningHook():
             return
         sorted, indices = self.fisher_list.sort(dim=0)
         
-        num_groups,mult,noise_decay = 4,1,1e-3
+        num_groups,mult,noise_decay = 2,1,1e-2
         split_size = len(self.fisher_list)//num_groups + 1
         ind_groups = torch.split(indices, split_size)
         noise_scale = torch.ones_like(self.fisher_list).float()
@@ -506,7 +506,7 @@ class FisherPruningHook():
             mask_len = len(self.groups[group][0].in_mask.view(-1))
             for module in self.groups[group]:
                 weight_list = torch.cat((weight_list,module.weight.view(-1)))
-        total_penalty = -1e-4 * torch.norm(weight_list,p=2)
+        total_penalty = 1e-4 * torch.norm(weight_list,p=1)
         return total_penalty
             
     def accumulate_fishers(self):
@@ -843,7 +843,7 @@ class FisherPruningHook():
         module.finetune = not pruning
         if type(module).__name__ == 'Conv2d':
             all_ones = module.weight.new_ones(module.in_channels,)
-            mx_range = float(100)
+            mx_range = float(1)
             module.register_buffer('in_mask', all_ones)
             if self.trained_mask:
                 module.register_buffer(
