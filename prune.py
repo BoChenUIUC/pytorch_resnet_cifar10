@@ -209,7 +209,7 @@ class FisherPruningHook():
             self.total_flops, self.total_acts = self.update_flop_act(model)
             # plot figure
             if itr == 0:
-                save_dir = f'metrics/L2_n4/'
+                save_dir = f'metrics/L2_p2/'
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
                 # fisher
@@ -510,7 +510,7 @@ class FisherPruningHook():
             mask_len = len(self.groups[group][0].in_mask.view(-1))
             for module in self.groups[group]:
                 weight_list = torch.cat((weight_list,module.weight.view(-1)))
-        total_penalty = -1e-4 * torch.norm(weight_list,p=2)
+        total_penalty = 1e-2 * torch.norm(weight_list,p=2)
         return total_penalty
             
     def accumulate_fishers(self):
