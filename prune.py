@@ -11,7 +11,7 @@ from torch.nn import Conv2d, ConvTranspose2d
 import seaborn as sns
 import matplotlib.pyplot as plt
 import resnet
-import os
+import os, math
 
 def load_checkpoint(model, filename):
     print("=> loading checkpoint '{}'".format(filename))
@@ -211,7 +211,7 @@ class FisherPruningHook():
             # plot figure
             if itr == 0:
                 sign = 'p' if self.penalty[0]>0 else 'n'
-                save_dir = f'metrics/L{abs(self.penalty[0])}_{sign}{-torch.log10(self.penalty[1])}/'
+                save_dir = f'metrics/L{abs(self.penalty[0])}_{sign}{-math.log10(self.penalty[1])}/'
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
                 # fisher
