@@ -11,6 +11,7 @@ from torch.nn import Conv2d, ConvTranspose2d
 import seaborn as sns
 import matplotlib.pyplot as plt
 import resnet
+import os
 
 def load_checkpoint(model, filename):
     print("=> loading checkpoint '{}'".format(filename))
