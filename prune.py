@@ -506,7 +506,7 @@ class FisherPruningHook():
             mask_len = len(self.groups[group][0].in_mask.view(-1))
             for module in self.groups[group]:
                 weight_list = torch.cat((weight_list,module.weight.view(-1)))
-        total_penalty = -1e-2 * torch.norm(weight_list,p=2)
+        total_penalty = -1e-1 * torch.norm(weight_list,p=2)
         return total_penalty
             
     def accumulate_fishers(self):
