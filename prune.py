@@ -208,24 +208,27 @@ class FisherPruningHook():
             self.total_flops, self.total_acts = self.update_flop_act(model)
             # plot figure
             if itr == 0:
+                save_dir = f'metrics/L2_p2/'
+                if not os.path.exists(save_dir):
+                    os.makedirs(save_dir)
                 # fisher
                 plt.figure(1)
                 self.fisher_list[self.fisher_list==0] = 1e-50
                 self.fisher_list = torch.log10(self.fisher_list).detach().cpu().numpy()
                 sns.displot(self.fisher_list, kind='hist', aspect=1.2)
-                plt.savefig(f'metrics/dist_fisher_{self.iter}_{loss:.3f}.png')
+                plt.savefig(save_dir + f'dist_fisher_{self.iter}_{loss:.3f}.png')
                 # magnitude
                 plt.figure(2)
                 self.mag_list[self.mag_list==0] = 1e-50
                 self.mag_list = torch.log10(self.mag_list).detach().cpu().numpy()
                 sns.displot(self.mag_list, kind='hist', aspect=1.2)
-                plt.savefig(f'metrics/dist_mag_{self.iter}.png')
+                plt.savefig(save_dir + f'dist_mag_{self.iter}.png')
                 # gradient
                 plt.figure(3)
                 self.grad_list[self.grad_list==0] = 1e-50
                 self.grad_list = torch.log10(self.grad_list).detach().cpu().numpy()
                 sns.displot(self.grad_list, kind='hist', aspect=1.2)
-                plt.savefig(f'metrics/dist_grad_{self.iter}.png')
+                plt.savefig(save_dir + f'dist_grad_{self.iter}.png')
                 self.iter += 1
         self.init_flops_acts()
 
