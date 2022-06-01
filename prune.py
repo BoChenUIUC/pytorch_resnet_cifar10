@@ -210,7 +210,8 @@ class FisherPruningHook():
             self.total_flops, self.total_acts = self.update_flop_act(model)
             # plot figure
             if itr == 0:
-                save_dir = f'metrics/L{torch.abs(self.penalty[0])}_{'p' if self.penalty[0]>0 else 'n'}{-torch.log10(self.penalty[1])}/'
+                sign = 'p' if self.penalty[0]>0 else 'n'
+                save_dir = f'metrics/L{torch.abs(self.penalty[0])}_{sign}{-torch.log10(self.penalty[1])}/'
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
                 # fisher
