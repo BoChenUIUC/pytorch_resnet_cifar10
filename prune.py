@@ -63,7 +63,7 @@ class FisherPruningHook():
         self.pruning = pruning
         self.trained_mask = trained_mask
         self.noise_mask = noise_mask
-        self.use_penalty = True
+        self.use_penalty = False
         self.delta = delta
         self.interval = interval
         # The key of self.input is conv module, and value of it
@@ -470,7 +470,7 @@ class FisherPruningHook():
             return
         sorted, indices = self.fisher_list.sort(dim=0)
         
-        num_groups,mult,noise_decay = 4,1,1e-2
+        num_groups,mult,noise_decay = 4,1,1e-1
         split_size = len(self.fisher_list)//num_groups + 1
         ind_groups = torch.split(indices, split_size)
         noise_scale = torch.ones_like(self.fisher_list).float()
@@ -506,7 +506,7 @@ class FisherPruningHook():
             mask_len = len(self.groups[group][0].in_mask.view(-1))
             for module in self.groups[group]:
                 weight_list = torch.cat((weight_list,module.weight.view(-1)))
-        total_penalty = -1e-5 * torch.norm(weight_list,p=1)
+        total_penalty = -1e-4 * torch.norm(weight_list,p=1)
         return total_penalty
             
     def accumulate_fishers(self):
@@ -843,7 +843,7 @@ class FisherPruningHook():
         module.finetune = not pruning
         if type(module).__name__ == 'Conv2d':
             all_ones = module.weight.new_ones(module.in_channels,)
-            mx_range = float(100)
+            mx_range = float(1)
             module.register_buffer('in_mask', all_ones)
             if self.trained_mask:
                 module.register_buffer(
