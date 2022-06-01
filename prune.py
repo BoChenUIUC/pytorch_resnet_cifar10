@@ -211,7 +211,7 @@ class FisherPruningHook():
             # plot figure
             if itr == 0:
                 sign = 'p' if self.penalty[0]>0 else 'n'
-                save_dir = f'metrics/L{torch.abs(self.penalty[0])}_{sign}{-torch.log10(self.penalty[1])}/'
+                save_dir = f'metrics/L{abs(self.penalty[0])}_{sign}{-torch.log10(self.penalty[1])}/'
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
                 # fisher
