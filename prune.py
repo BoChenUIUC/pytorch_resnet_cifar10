@@ -63,7 +63,7 @@ class FisherPruningHook():
         self.pruning = pruning
         self.trained_mask = trained_mask
         self.noise_mask = noise_mask
-        self.use_penalty = False
+        self.use_penalty = True
         self.delta = delta
         self.interval = interval
         # The key of self.input is conv module, and value of it
@@ -506,7 +506,7 @@ class FisherPruningHook():
             mask_len = len(self.groups[group][0].in_mask.view(-1))
             for module in self.groups[group]:
                 weight_list = torch.cat((weight_list,module.weight.view(-1)))
-        total_penalty = -1e-6 * torch.norm(weight_list,p=1)
+        total_penalty = 0 * torch.norm(weight_list,p=1)
         return total_penalty
             
     def accumulate_fishers(self):
