@@ -56,6 +56,7 @@ class FisherPruningHook():
         deploy_from=None,
         resume_from=None,
         start_from=None,
+        penalty=None,
         save_flops_thr=[0.75, 0.5, 0.25],
         save_acts_thr=[0.75, 0.5, 0.25],
     ):
@@ -64,7 +65,7 @@ class FisherPruningHook():
         self.pruning = pruning
         self.trained_mask = trained_mask
         self.noise_mask = noise_mask
-        self.use_penalty = True
+        self.penalty = penalty
         self.delta = delta
         self.interval = interval
         # The key of self.input is conv module, and value of it
@@ -209,7 +210,7 @@ class FisherPruningHook():
             self.total_flops, self.total_acts = self.update_flop_act(model)
             # plot figure
             if itr == 0:
-                save_dir = f'metrics/L1_p2/'
+                save_dir = f'metrics/L{torch.abs(self.penalty[0])}_{'p' if self.penalty[0]>0 else 'n'}{-torch.log10(self.penalty[1])}/'
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
                 # fisher
@@ -470,7 +471,7 @@ class FisherPruningHook():
                 module.in_mask[channel] = 0
     
     def add_noise_mask(self):
-        if self.use_penalty:
+        if self.penalty is not None:
             return
         sorted, indices = self.fisher_list.sort(dim=0)
         
@@ -510,7 +511,7 @@ class FisherPruningHook():
             mask_len = len(self.groups[group][0].in_mask.view(-1))
             for module in self.groups[group]:
                 weight_list = torch.cat((weight_list,module.weight.view(-1)))
-        total_penalty = 1e-2 * torch.norm(weight_list,p=1)
+        total_penalty = self.penalty[1] * torch.norm(weight_list,p=torch.abs(self.penalty[0]))
         return total_penalty
             
     def accumulate_fishers(self):
@@ -864,7 +865,7 @@ class FisherPruningHook():
                             mask = mask.view(1,-1,1,1)
                             x = x * mask.to(x.device)
                         elif m.noise_mask:
-                            if not self.use_penalty:
+                            if self.penalty is None:
                                 mask = m.in_mask.view(1,-1,1,1).to(x.device)
                                 noise = torch.empty_like(x).normal_(std=mx_range)*mask
                                 x = x + noise

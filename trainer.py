@@ -88,7 +88,7 @@ def main():
             
     # optionally pruning
     if args.prune:
-        hook = FisherPruningHook(pruning=True, noise_mask=True, start_from=args.prune)
+        hook = FisherPruningHook(pruning=True, noise_mask=True, start_from=args.prune, penalty=[-1,1e-1])
         hook.after_build_model(model)
         hook.before_run(model)
 
@@ -220,13 +220,10 @@ def train(train_loader, model, criterion, optimizer, epoch, hook):
         if i % args.print_freq == 0:
             if hook is not None:
                 print('Epoch: [{0}][{1}/{2}]\t'
-                      'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                      'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                      'Prec@1 {top1.val:.3f} ({top1.avg:.3f})'
-                      'F: {hook.total_flops:.4f}. A: {hook.total_acts:.4f}'.format(
-                          epoch, i, len(train_loader), batch_time=batch_time,
-                          data_time=data_time, loss=losses, top1=top1, hook=hook))
+                      'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
+                      'F: {hook.total_flops:.4f}. A: {hook.total_acts:.4f} {hook.penalty[0]} {hook.penalty[1]}'.format(
+                          epoch, i, len(train_loader), loss=losses, top1=top1, hook=hook))
             else:
                 print('Epoch: [{0}][{1}/{2}]\t'
                       'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
