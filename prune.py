@@ -516,7 +516,7 @@ class FisherPruningHook():
                 
         sorted, indices = weight_list.sort(dim=0)
         num_groups,mult,noise_decay = 2,1,1e-1
-        split_size = len(self.fisher_list)//num_groups + 1
+        split_size = len(weight_list)//num_groups + 1
         ind_groups = torch.split(indices, split_size)
         for ind_group in ind_groups:
             weight_list[ind_group] *= mult
