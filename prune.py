@@ -518,6 +518,7 @@ class FisherPruningHook():
         num_groups,mult,noise_decay = 2,1,1e-1
         split_size = len(weight_list)//num_groups + 1
         ind_groups = torch.split(indices, split_size)
+        # weight should be adjusted/scaled
         for ind_group in ind_groups:
             weight_list[ind_group] *= mult
             mult *= noise_decay
