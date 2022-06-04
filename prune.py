@@ -519,7 +519,7 @@ class FisherPruningHook():
         split_size = len(weight_list)//num_groups + 1
         ind_groups = torch.split(indices, split_size)
         for ind_group in ind_groups:
-            weight_list[ind_group] *= mult
+            #weight_list[ind_group] *= mult
             mult *= noise_decay
         
         total_penalty = self.penalty[0]/abs(self.penalty[0]) * self.penalty[1] * torch.norm(weight_list,p=abs(self.penalty[0]))
