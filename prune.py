@@ -502,7 +502,7 @@ class FisherPruningHook():
         def modify_grad(w):
             alpha = 1e-4
             w_grad = w.grad - alpha * w / torch.abs(w)
-            return w_grad
+            return w_grad.detach()
             
         for module, name in self.conv_names.items():
             if self.group_modules is not None and module in self.group_modules:
