@@ -499,10 +499,10 @@ class FisherPruningHook():
             mask_start += mask_len
             
     def add_penalty_to_grad(self):
-        return
         def modify_grad(w):
+            w = w.detach()
             w_grad = w.grad + self.penalty[1] * self.penalty[0]/abs(self.penalty[0]) * w / torch.abs(w)
-            return w_grad.detach()
+            return w_grad
             
         for module, name in self.conv_names.items():
             if self.group_modules is not None and module in self.group_modules:
