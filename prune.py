@@ -459,6 +459,8 @@ class FisherPruningHook():
         module, channel = info['module'], info['channel']
         if self.trained_mask:
             pass
+        elif self.penalty is not None:
+            self.add_penalty_to_grad()
         elif self.noise_mask:
             self.add_noise_mask()
         else:
@@ -472,8 +474,6 @@ class FisherPruningHook():
                 module.in_mask[channel] = 0
     
     def add_noise_mask(self):
-        if self.penalty is not None:
-            return
         sorted, indices = self.fisher_list.sort(dim=0)
         
         num_groups,mult,noise_decay = 4,1,1e-1
@@ -498,6 +498,22 @@ class FisherPruningHook():
                 module.in_mask = noise_scale[mask_start:mask_start+mask_len]
             mask_start += mask_len
             
+    def add_penalty_to_grad(self):
+        def modify_grad(w):
+            alpha = 1e-4
+            w_grad = w.grad - alpha * w / torch.abs(w)
+            return w_grad
+            
+        for module, name in self.conv_names.items():
+            if self.group_modules is not None and module in self.group_modules:
+                continue
+            module.weight.grad = modify_grad(module.weight)
+                
+        for group in self.groups:
+            mask_len = len(self.groups[group][0].in_mask.view(-1))
+            for module in self.groups[group]:
+                module.weight.grad = modify_grad(module.weight)
+    
     def mag_penalty(self):
         # try negative and different factors and p
         weight_list = None
@@ -876,10 +892,9 @@ class FisherPruningHook():
                             mask = mask.view(1,-1,1,1)
                             x = x * mask.to(x.device)
                         elif m.noise_mask:
-                            if self.penalty is None:
-                                mask = m.in_mask.view(1,-1,1,1).to(x.device)
-                                noise = torch.empty_like(x).normal_(std=mx_range)*mask
-                                x = x + noise
+                            mask = m.in_mask.view(1,-1,1,1).to(x.device)
+                            noise = torch.empty_like(x).normal_(std=mx_range)*mask
+                            x = x + noise
                         else:
                             mask = m.in_mask.view(1,-1,1,1)
                             x = x * mask.to(x.device)

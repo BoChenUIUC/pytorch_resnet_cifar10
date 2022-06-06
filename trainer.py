@@ -88,7 +88,7 @@ def main():
             
     # optionally pruning
     if args.prune:
-        hook = FisherPruningHook(pruning=True, noise_mask=True, start_from=args.prune, penalty=[-1,1e-4])
+        hook = FisherPruningHook(pruning=True, start_from=args.prune, penalty=[-1,1e-4])
         hook.after_build_model(model)
         hook.before_run(model)
 
@@ -153,7 +153,6 @@ def main():
         # remember best prec@1 and save checkpoint
         is_best = prec1 > best_prec1
         best_prec1 = max(prec1, best_prec1)
-        continue
 
         if epoch > 0 and epoch % args.save_every == 0:
             save_checkpoint({
@@ -195,7 +194,7 @@ def train(train_loader, model, criterion, optimizer, epoch, hook):
         # compute output
         output = model(input_var)
         loss = criterion(output, target_var)
-        loss += hook.mag_penalty()
+        #loss += hook.mag_penalty()
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
