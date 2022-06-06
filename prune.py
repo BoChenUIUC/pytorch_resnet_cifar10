@@ -499,6 +499,7 @@ class FisherPruningHook():
             mask_start += mask_len
             
     def add_penalty_to_grad(self):
+        return
         def modify_grad(w):
             w_grad = w.grad + self.penalty[1] * self.penalty[0]/abs(self.penalty[0]) * w / torch.abs(w)
             return w_grad.detach()
