@@ -501,7 +501,7 @@ class FisherPruningHook():
     def add_penalty_to_grad(self):
         def modify_grad(w):
             w = w.detach()
-            w_grad = w.grad + self.penalty[1] * self.penalty[0]/abs(self.penalty[0]) * w / torch.abs(w)
+            w_grad = w.grad + self.penalty[1] * self.penalty[0]/torch.abs(self.penalty[0]) * w / torch.abs(w)
             return w_grad
             
         for module, name in self.conv_names.items():
