@@ -66,6 +66,7 @@ class FisherPruningHook():
         self.trained_mask = trained_mask
         self.noise_mask = noise_mask
         self.penalty = penalty
+        self.use_scaler = use_scaler
         self.delta = delta
         self.interval = interval
         # The key of self.input is conv module, and value of it
