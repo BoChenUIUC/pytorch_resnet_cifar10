@@ -516,7 +516,6 @@ class FisherPruningHook():
             for module in self.groups[group]:
                 weight_list = torch.cat((weight_list,module.weight.view(-1)))
                 scaler_list = torch.cat((scaler_list,module.weight_scaler.view(-1)))
-        print(scaler_list.size())
                 
         #sorted, indices = weight_list.sort(dim=0)
         #num_groups,mult,noise_decay = 2,1,1e-1

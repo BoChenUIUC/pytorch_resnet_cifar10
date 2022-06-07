@@ -88,7 +88,7 @@ def main():
             
     # optionally pruning
     if args.prune:
-        hook = FisherPruningHook(pruning=True, use_scaler=True, start_from=args.prune, penalty=[-1,1e-2])
+        hook = FisherPruningHook(pruning=True, use_scaler=True, start_from=args.prune, penalty=[-1,1e2])
         hook.after_build_model(model)
         hook.before_run(model)
 
