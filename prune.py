@@ -516,7 +516,6 @@ class FisherPruningHook():
             for module in self.groups[group]:
                 weight_list = torch.cat((weight_list,module.weight.view(-1)))
                 scaler_list = torch.cat((scaler_list,module.weight_scaler.view(-1)))
-        print(scaler_list.size())
                 
         #sorted, indices = weight_list.sort(dim=0)
         #num_groups,mult,noise_decay = 2,1,1e-1
@@ -526,7 +525,7 @@ class FisherPruningHook():
         #    weight_list[ind_group] *= mult
         #    mult *= noise_decay
         
-        total_penalty = self.penalty[0]/abs(self.penalty[0]) * self.penalty[1] * torch.norm(weight_list*F.softmax(scaler_list),p=abs(self.penalty[0]))
+        total_penalty = self.penalty[0]/abs(self.penalty[0]) * self.penalty[1] * torch.norm(weight_list*F.softmax(scaler_list,dim=-1),p=abs(self.penalty[0]))
         return total_penalty
             
     def accumulate_fishers(self):
