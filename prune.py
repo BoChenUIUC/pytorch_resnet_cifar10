@@ -52,7 +52,7 @@ class FisherPruningHook():
         interval=10,
         trained_mask=False,
         noise_mask=False,
-        one_shot=False,
+        use_scaler=False,
         deploy_from=None,
         resume_from=None,
         start_from=None,
@@ -459,8 +459,6 @@ class FisherPruningHook():
         module, channel = info['module'], info['channel']
         if self.trained_mask:
             pass
-        elif self.penalty is not None:
-            self.add_penalty_to_grad()
         elif self.noise_mask:
             self.add_noise_mask()
         else:
@@ -497,39 +495,26 @@ class FisherPruningHook():
             for module in self.groups[group]:
                 module.in_mask = noise_scale[mask_start:mask_start+mask_len]
             mask_start += mask_len
-            
-    def add_penalty_to_grad(self):
-        def modify_grad(w):
-            w_grad = w.grad
-            w = w.detach()
-            w_grad += self.penalty[1] * self.penalty[0]/abs(self.penalty[0]) * w / torch.abs(w)
-            return w_grad
-            
-        for module, name in self.conv_names.items():
-            if self.group_modules is not None and module in self.group_modules:
-                continue
-            module.weight.grad = modify_grad(module.weight)
-                
-        for group in self.groups:
-            mask_len = len(self.groups[group][0].in_mask.view(-1))
-            for module in self.groups[group]:
-                module.weight.grad = modify_grad(module.weight)
     
     def mag_penalty(self):
         # try negative and different factors and p
         weight_list = None
+        scaler_list = None
         for module, name in self.conv_names.items():
             if self.group_modules is not None and module in self.group_modules:
                 continue
             if weight_list is None:
                 weight_list = module.weight.view(-1)
+                scaler_list = module.weight_scaler.view(-1)
             else:
                 weight_list = torch.cat((weight_list,module.weight.view(-1)))
+                scaler_list = torch.cat((scaler_list,module.weight_scaler.view(-1)))
                 
         for group in self.groups:
             mask_len = len(self.groups[group][0].in_mask.view(-1))
             for module in self.groups[group]:
                 weight_list = torch.cat((weight_list,module.weight.view(-1)))
+                scaler_list = torch.cat((scaler_list,module.weight_scaler.view(-1)))
                 
         #sorted, indices = weight_list.sort(dim=0)
         #num_groups,mult,noise_decay = 2,1,1e-1
@@ -539,7 +524,7 @@ class FisherPruningHook():
         #    weight_list[ind_group] *= mult
         #    mult *= noise_decay
         
-        total_penalty = self.penalty[0]/abs(self.penalty[0]) * self.penalty[1] * torch.norm(weight_list,p=abs(self.penalty[0]))
+        total_penalty = self.penalty[0]/abs(self.penalty[0]) * self.penalty[1] * torch.norm(weight_list*F.softmax(scaler_list),p=abs(self.penalty[0]))
         return total_penalty
             
     def accumulate_fishers(self):
@@ -874,6 +859,7 @@ class FisherPruningHook():
         module.trained_mask = self.trained_mask
         module.noise_mask = self.noise_mask
         module.finetune = not pruning
+        module.use_scaler = self.use_scaler
         if type(module).__name__ == 'Conv2d':
             all_ones = module.weight.new_ones(module.in_channels,)
             mx_range = float(1)
@@ -881,6 +867,9 @@ class FisherPruningHook():
             if self.trained_mask:
                 module.register_buffer(
                     'soft_mask', torch.nn.Parameter(torch.randn(module.in_channels)).to(module.weight.device))
+            if self.use_scaler:
+                module.register_buffer(
+                    'weight_scaler', torch.nn.Parameter(torch.randn(module.weight.size())).to(module.weight.device))
             def modified_forward(m, x):
                 if self.use_mask:
                     if not m.finetune:
