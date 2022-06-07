@@ -458,7 +458,7 @@ class FisherPruningHook():
             info.update(self.find_pruning_channel(group, fisher, in_mask, info))
                 
         module, channel = info['module'], info['channel']
-        if self.trained_mask:
+        if self.trained_mask or self.use_scaler:
             pass
         elif self.noise_mask:
             self.add_noise_mask()
