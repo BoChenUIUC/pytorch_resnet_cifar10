@@ -525,7 +525,10 @@ class FisherPruningHook():
         #    weight_list[ind_group] *= mult
         #    mult *= noise_decay
         
-        total_penalty = self.penalty[0]/abs(self.penalty[0]) * self.penalty[1] * torch.norm(weight_list*F.softmax(scaler_list,dim=-1),p=abs(self.penalty[0]))
+        #total_penalty = self.penalty[0]/abs(self.penalty[0]) * self.penalty[1] * torch.norm(weight_list*F.softmax(scaler_list,dim=-1),p=abs(self.penalty[0]))
+        new_weight_list = weight_list*F.softmax(scaler_list,dim=-1)
+        total_penalty = self.penalty[0]/abs(self.penalty[0]) * self.penalty[1] * ( torch.norm(new_weight_list,p=1) + torch.norm(new_weight_list,p=2))
+        
         return total_penalty
             
     def accumulate_fishers(self):
