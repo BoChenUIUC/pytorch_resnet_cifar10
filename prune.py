@@ -500,22 +500,18 @@ class FisherPruningHook():
     def mag_penalty(self):
         # try negative and different factors and p
         weight_list = None
-        scaler_list = None
         for module, name in self.conv_names.items():
             if self.group_modules is not None and module in self.group_modules:
                 continue
             if weight_list is None:
                 weight_list = module.weight.view(-1)
-                scaler_list = module.weight_scaler.view(-1)
             else:
                 weight_list = torch.cat((weight_list,module.weight.view(-1)))
-                scaler_list = torch.cat((scaler_list,module.weight_scaler.view(-1)))
                 
         for group in self.groups:
             mask_len = len(self.groups[group][0].in_mask.view(-1))
             for module in self.groups[group]:
                 weight_list = torch.cat((weight_list,module.weight.view(-1)))
-                scaler_list = torch.cat((scaler_list,module.weight_scaler.view(-1)))
                 
         #sorted, indices = weight_list.sort(dim=0)
         #num_groups,mult,noise_decay = 2,1,1e-1
@@ -526,8 +522,7 @@ class FisherPruningHook():
         #    mult *= noise_decay
         
         #total_penalty = self.penalty[0]/abs(self.penalty[0]) * self.penalty[1] * torch.norm(weight_list*F.softmax(scaler_list,dim=-1),p=abs(self.penalty[0]))
-        new_weight_list = weight_list*F.softmax(scaler_list,dim=-1)
-        total_penalty = -1e-4 * torch.norm(new_weight_list,p=1) + 1e-4 * torch.norm(new_weight_list,p=2)
+        total_penalty = -1e-4 * torch.norm(weight_list,p=1) + 1e-4 * torch.norm(weight_list,p=2)
         
         return total_penalty
             
