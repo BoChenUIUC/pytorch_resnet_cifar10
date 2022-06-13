@@ -458,7 +458,7 @@ class FisherPruningHook():
             info.update(self.find_pruning_channel(group, fisher, in_mask, info))
                 
         module, channel = info['module'], info['channel']
-        if self.trained_mask or self.use_scaler:
+        if self.trained_mask or self.use_scaler or self.penalty is not None:
             pass
         elif self.noise_mask:
             self.add_noise_mask()
@@ -527,7 +527,7 @@ class FisherPruningHook():
         
         #total_penalty = self.penalty[0]/abs(self.penalty[0]) * self.penalty[1] * torch.norm(weight_list*F.softmax(scaler_list,dim=-1),p=abs(self.penalty[0]))
         new_weight_list = weight_list*F.softmax(scaler_list,dim=-1)
-        total_penalty = -( 1e1 * torch.norm(new_weight_list,p=1) + 1e-4 * torch.norm(new_weight_list,p=2) )
+        total_penalty = -1e-4 * torch.norm(new_weight_list,p=1) + 1e-4 * torch.norm(new_weight_list,p=2)
         
         return total_penalty
             
