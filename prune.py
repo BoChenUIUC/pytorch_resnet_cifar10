@@ -527,7 +527,7 @@ class FisherPruningHook():
         
         #total_penalty = self.penalty[0]/abs(self.penalty[0]) * self.penalty[1] * torch.norm(weight_list*F.softmax(scaler_list,dim=-1),p=abs(self.penalty[0]))
         new_weight_list = weight_list*F.softmax(scaler_list,dim=-1)
-        total_penalty = -( 1e-3 * torch.norm(new_weight_list,p=1) + 1e-4 * torch.norm(new_weight_list,p=2) )
+        total_penalty = -( 1e-2 * torch.norm(new_weight_list,p=1) + 1e-4 * torch.norm(new_weight_list,p=2) )
         
         return total_penalty
             
