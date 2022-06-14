@@ -88,7 +88,7 @@ def main():
             
     # optionally pruning
     if args.prune:
-        hook = FisherPruningHook(pruning=True, start_from=args.prune, penalty=[-1e-4,-1e-1])
+        hook = FisherPruningHook(pruning=True, start_from=args.prune, penalty=[0,0,0,-1e-4])
         hook.after_build_model(model)
         hook.before_run(model)
 
@@ -149,7 +149,7 @@ def main():
 
         # evaluate on validation set
         prec1 = validate(val_loader, model, criterion)
-
+        continue
         # remember best prec@1 and save checkpoint
         is_best = prec1 > best_prec1
         best_prec1 = max(prec1, best_prec1)

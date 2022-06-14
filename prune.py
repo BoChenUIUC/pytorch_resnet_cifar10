@@ -521,7 +521,8 @@ class FisherPruningHook():
         #    weight_list[ind_group] *= mult
         #    mult *= noise_decay
         
-        total_penalty = self.penalty[0] * torch.norm(weight_list,p=1) + self.penalty[1] * torch.norm(weight_list,p=2) 
+        total_penalty = self.penalty[0] * torch.norm(weight_list,p=1) + self.penalty[1] * torch.norm(weight_list,p=2) + \
+                        self.penalty[2] * torch.norm(weight_list,p=3) + self.penalty[3] * torch.norm(weight_list,p=4) 
         #total_penalty = -1e-4 * torch.norm(weight_list,p=1) - 1e-4 * torch.norm(weight_list,p=2)
         
         return total_penalty
