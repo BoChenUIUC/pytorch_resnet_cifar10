@@ -212,7 +212,7 @@ class FisherPruningHook():
             # plot figure
             if itr == 0:
                 sign = 'p' if self.penalty[0]>0 else 'n'
-                save_dir = f'metrics/L{abs(self.penalty[0])}_{sign}{int(-math.log10(self.penalty[1]))}/'
+                save_dir = f'metrics/L{int(-math.log10(abs(self.penalty[0])))}_{int(-math.log10(abs(self.penalty[1])))}/'
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
                 # fisher
@@ -521,8 +521,8 @@ class FisherPruningHook():
         #    weight_list[ind_group] *= mult
         #    mult *= noise_decay
         
-        #total_penalty = self.penalty[0]/abs(self.penalty[0]) * self.penalty[1] * torch.norm(weight_list*F.softmax(scaler_list,dim=-1),p=abs(self.penalty[0]))
-        total_penalty = -1e-4 * torch.norm(weight_list,p=1) + 1e-4 * torch.norm(weight_list,p=2)
+        total_penalty = self.penalty[0] * torch.norm(weight_list,p=1) + self.penalty[1] * torch.norm(weight_list,p=2) 
+        #total_penalty = -1e-4 * torch.norm(weight_list,p=1) - 1e-4 * torch.norm(weight_list,p=2)
         
         return total_penalty
             
