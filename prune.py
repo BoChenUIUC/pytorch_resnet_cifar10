@@ -65,6 +65,7 @@ class FisherPruningHook():
         self.pruning = pruning
         self.trained_mask = trained_mask
         self.noise_mask = noise_mask
+        self.use_ista = use_ista
         self.penalty = penalty
         self.delta = delta
         self.interval = interval
