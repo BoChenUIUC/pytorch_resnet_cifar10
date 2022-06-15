@@ -52,6 +52,7 @@ class FisherPruningHook():
         interval=10,
         trained_mask=False,
         noise_mask=False,
+        use_ista=False,
         deploy_from=None,
         resume_from=None,
         start_from=None,
@@ -462,6 +463,8 @@ class FisherPruningHook():
             pass
         elif self.noise_mask:
             self.add_noise_mask()
+        elif self.use_ista:
+            self.ista()
         else:
             # only modify in_mask is sufficient
             if isinstance(module, int):
@@ -471,6 +474,9 @@ class FisherPruningHook():
             elif module is not None:
                 # the case for single module
                 module.in_mask[channel] = 0
+                
+    def ista(self):
+        pass
     
     def add_noise_mask(self):
         sorted, indices = self.fisher_list.sort(dim=0)
