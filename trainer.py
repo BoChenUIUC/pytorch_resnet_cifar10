@@ -223,7 +223,7 @@ def train(train_loader, model, criterion, optimizer, epoch, hook):
                 print('Epoch: [{0}][{1}/{2}]\t'
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                       'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
-                      'F: {hook.total_flops:.4f}. A: {hook.total_acts:.4f} {hook.penalty[0]} {hook.penalty[1]} {hook.penalty[2]} {hook.penalty[3]}'.format(
+                      'F: {hook.total_flops:.4f}. A: {hook.total_acts:.4f}'.format(
                           epoch, i, len(train_loader), loss=losses, top1=top1, hook=hook))
             else:
                 print('Epoch: [{0}][{1}/{2}]\t'
