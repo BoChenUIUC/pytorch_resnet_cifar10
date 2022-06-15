@@ -52,7 +52,6 @@ class FisherPruningHook():
         interval=10,
         trained_mask=False,
         noise_mask=False,
-        use_scaler=False,
         deploy_from=None,
         resume_from=None,
         start_from=None,
@@ -66,7 +65,6 @@ class FisherPruningHook():
         self.trained_mask = trained_mask
         self.noise_mask = noise_mask
         self.penalty = penalty
-        self.use_scaler = use_scaler
         self.delta = delta
         self.interval = interval
         # The key of self.input is conv module, and value of it
@@ -457,7 +455,7 @@ class FisherPruningHook():
             info.update(self.find_pruning_channel(group, fisher, in_mask, info))
                 
         module, channel = info['module'], info['channel']
-        if self.trained_mask or self.use_scaler or self.penalty is not None:
+        if self.trained_mask or self.penalty is not None:
             pass
         elif self.noise_mask:
             self.add_noise_mask()
@@ -497,6 +495,8 @@ class FisherPruningHook():
             mask_start += mask_len
     
     def mag_penalty(self):
+        if self.penalty is None:
+            return 0
         # try negative and different factors and p
         weight_list = None
         for module, name in self.conv_names.items():
@@ -858,7 +858,6 @@ class FisherPruningHook():
         module.trained_mask = self.trained_mask
         module.noise_mask = self.noise_mask
         module.finetune = not pruning
-        module.use_scaler = self.use_scaler
         if type(module).__name__ == 'Conv2d':
             all_ones = module.weight.new_ones(module.in_channels,)
             mx_range = float(1)
@@ -866,9 +865,6 @@ class FisherPruningHook():
             if self.trained_mask:
                 module.register_buffer(
                     'soft_mask', torch.nn.Parameter(torch.randn(module.in_channels)).to(module.weight.device))
-            if self.use_scaler:
-                module.register_buffer(
-                    'weight_scaler', torch.nn.Parameter(torch.randn(module.weight.size())).to(module.weight.device))
             def modified_forward(m, x):
                 if self.use_mask:
                     if not m.finetune:
