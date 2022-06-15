@@ -477,8 +477,7 @@ class FisherPruningHook():
                 module.in_mask[channel] = 0
                 
     def ista(self):
-        return
-        gamma = 1e-4
+        gamma = 1e-6
         for module, name in self.conv_names.items():
             if self.group_modules is not None and module in self.group_modules:
                 continue
