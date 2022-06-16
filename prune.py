@@ -50,8 +50,6 @@ class FisherPruningHook():
         pruning=True,
         delta='acts',
         interval=10,
-        trained_mask=False,
-        noise_mask=False,
         use_ista=False,
         deploy_from=None,
         resume_from=None,
@@ -63,8 +61,6 @@ class FisherPruningHook():
 
         assert delta in ('acts', 'flops')
         self.pruning = pruning
-        self.trained_mask = trained_mask
-        self.noise_mask = noise_mask
         self.use_ista = use_ista
         self.penalty = penalty
         self.delta = delta
@@ -214,27 +210,29 @@ class FisherPruningHook():
                 if self.penalty is not None:
                     save_dir = f'metrics/L{int(-math.log10(max(1e-8,abs(self.penalty[0]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[1]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[2]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[3]))))}/'
                 else:
-                    save_dir = f'metrics/expqnt3/'
+                    save_dir = f'metrics/base/'
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
+                fig, axs = plt.subplots(ncols=3)
                 # fisher
-                plt.figure(1)
+                #plt.figure(1)
                 self.fisher_list[self.fisher_list==0] = 1e-50
                 self.fisher_list = torch.log10(self.fisher_list).detach().cpu().numpy()
-                sns.displot(self.fisher_list, kind='hist', aspect=1.2)
-                plt.savefig(save_dir + f'dist_fisher_{self.iter}_{loss:.3f}.png')
+                sns.displot(self.fisher_list, kind='hist', aspect=1.2, ax=axs[0])
+                #plt.savefig(save_dir + f'dist_fisher_{self.iter}_{loss:.3f}.png')
                 # magnitude
-                plt.figure(2)
+                #plt.figure(2)
                 self.mag_list[self.mag_list==0] = 1e-50
                 self.mag_list = torch.log10(self.mag_list).detach().cpu().numpy()
-                sns.displot(self.mag_list, kind='hist', aspect=1.2)
-                plt.savefig(save_dir + f'dist_mag_{self.iter}.png')
+                sns.displot(self.mag_list, kind='hist', aspect=1.2, ax=axs[1])
+                #plt.savefig(save_dir + f'dist_mag_{self.iter}.png')
                 # gradient
-                plt.figure(3)
+                #plt.figure(3)
                 self.grad_list[self.grad_list==0] = 1e-50
                 self.grad_list = torch.log10(self.grad_list).detach().cpu().numpy()
-                sns.displot(self.grad_list, kind='hist', aspect=1.2)
-                plt.savefig(save_dir + f'dist_grad_{self.iter}.png')
+                sns.displot(self.grad_list, kind='hist', aspect=1.2, ax=axs[2])
+                #plt.savefig(save_dir + f'dist_grad_{self.iter}.png')
+                plt.savefig(save_dir + f'{self.iter}_{loss:.3f}.png')
                 self.iter += 1
         self.init_flops_acts()
 
@@ -460,10 +458,8 @@ class FisherPruningHook():
             info.update(self.find_pruning_channel(group, fisher, in_mask, info))
                 
         module, channel = info['module'], info['channel']
-        if self.trained_mask or self.penalty is not None:
+        if self.penalty is not None:
             pass
-        elif self.noise_mask:
-            self.add_noise_mask()
         elif self.use_ista:
             self.ista()
         else:
@@ -477,6 +473,7 @@ class FisherPruningHook():
                 module.in_mask[channel] = 0
                 
     def ista(self):
+        return
         def exp_quantization(x):
             #x = torch.clamp(x, min=1e-6)
             bins = torch.FloatTensor([1e-6,1e-4,1e-2,1,1e2,1e4,1e6]).to(x.device)
@@ -884,34 +881,16 @@ class FisherPruningHook():
                 will make conv's forward behave differently.
         """
         # same group same softmask
-        module.trained_mask = self.trained_mask
         module.noise_mask = self.noise_mask
         module.finetune = not pruning
         if type(module).__name__ == 'Conv2d':
             all_ones = module.weight.new_ones(module.in_channels,)
-            mx_range = float(1)
             module.register_buffer('in_mask', all_ones)
-            if self.trained_mask:
-                module.register_buffer(
-                    'soft_mask', torch.nn.Parameter(torch.randn(module.in_channels)).to(module.weight.device))
             def modified_forward(m, x):
                 if self.use_mask:
                     if not m.finetune:
-                        if m.trained_mask:
-                            if hasattr(m, 'group_master'):
-                                mask = F.sigmoid(self.name2module[m.group_master].soft_mask)
-                            else:
-                                mask = F.sigmoid(m.soft_mask)
-                            m.in_mask[:] = mask.data
-                            mask = mask.view(1,-1,1,1)
-                            x = x * mask.to(x.device)
-                        elif m.noise_mask:
-                            mask = m.in_mask.view(1,-1,1,1).to(x.device)
-                            noise = torch.empty_like(x).normal_(std=mx_range)*mask
-                            x = x + noise
-                        else:
-                            mask = m.in_mask.view(1,-1,1,1)
-                            x = x * mask.to(x.device)
+                        mask = m.in_mask.view(1,-1,1,1)
+                        x = x * mask.to(x.device)
                     else:
                         # if it has no ancestor
                         # we need to mask it
