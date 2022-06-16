@@ -200,6 +200,9 @@ def train(train_loader, model, criterion, optimizer, epoch, hook):
         # compute gradient and do SGD step
         optimizer.zero_grad()
         loss.backward()
+        # if pruning
+        if hook is not None:
+            hook.after_backward(i, model)
         optimizer.step()
 
         output = output.float()
@@ -212,11 +215,6 @@ def train(train_loader, model, criterion, optimizer, epoch, hook):
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
-        
-        # if pruning
-        if hook is not None:
-            # backward the regularization function
-            hook.after_backward(i, model)
 
         if i % args.print_freq == 0:
             if hook is not None:
