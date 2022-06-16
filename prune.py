@@ -213,7 +213,7 @@ class FisherPruningHook():
                     save_dir = f'metrics/base/'
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
-                fig, axs = plt.subplots(ncols=3, figsize=(10, 4))
+                fig, axs = plt.subplots(ncols=3, figsize=(12, 4))
                 # fisher
                 #plt.figure(1)
                 self.fisher_list[self.fisher_list==0] = 1e-50
