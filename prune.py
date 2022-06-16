@@ -214,7 +214,7 @@ class FisherPruningHook():
                 if self.penalty is not None:
                     save_dir = f'metrics/L{int(-math.log10(max(1e-8,abs(self.penalty[0]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[1]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[2]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[3]))))}/'
                 else:
-                    save_dir = f'metrics/expqnt2/'
+                    save_dir = f'metrics/expqnt3/'
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
                 # fisher
@@ -479,7 +479,7 @@ class FisherPruningHook():
     def ista(self):
         def exp_quantization(x):
             bins = torch.FloatTensor([1e-8,1e-6,1e-4,1e-2,1,1e2,1e4,1e6]).to(x.device)
-            decay_factor = 1e-2
+            decay_factor = 1e-3
             dist = torch.abs(torch.abs(x).unsqueeze(-1) - bins)
             _,min_idx = dist.min(dim=-1)
             offsets = bins[min_idx] * decay_factor * torch.sign(bins[min_idx] - torch.abs(x))
