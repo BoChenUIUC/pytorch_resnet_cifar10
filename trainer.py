@@ -218,6 +218,7 @@ def train(train_loader, model, criterion, optimizer, epoch, hook):
 
         if i % args.print_freq == 0:
             if hook is not None:
+                print(hook.ista_err)
                 print('Epoch: [{0}][{1}/{2}]\t'
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                       'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
