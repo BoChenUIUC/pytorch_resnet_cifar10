@@ -214,7 +214,7 @@ class FisherPruningHook():
                 if self.penalty is not None:
                     save_dir = f'metrics/L{int(-math.log10(max(1e-8,abs(self.penalty[0]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[1]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[2]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[3]))))}/'
                 else:
-                    save_dir = f'metrics/expqnt4/'
+                    save_dir = f'metrics/expqnt2/'
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
                 # fisher
@@ -480,15 +480,12 @@ class FisherPruningHook():
         def exp_quantization(x):
             #x = torch.clamp(x, min=1e-6)
             bins = torch.FloatTensor([1e-6,1e-4,1e-2,1,1e2,1e4,1e6]).to(x.device)
-            decay_factor = 1e-4
-            dist = torch.abs(torch.log10(torch.abs(x)).unsqueeze(-1) - torch.log10(bins))
+            decay_factor = 1e-2
+            dist = torch.abs(torch.abs(x).unsqueeze(-1) - bins)
             _,min_idx = dist.min(dim=-1)
             # add
             offset = bins[min_idx] - torch.abs(x)
             x = torch.sign(x) * (torch.abs(x) + decay_factor * offset)
-            # or mult
-            #offset = torch.log10(bins[min_idx]/torch.abs(x))
-            #x *= torch.pow(10, offset * (1 - ))
             return x
         for module, name in self.conv_names.items():
             if self.group_modules is not None and module in self.group_modules:
