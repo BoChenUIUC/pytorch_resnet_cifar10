@@ -479,10 +479,10 @@ class FisherPruningHook():
     def ista(self):
         def exp_quantization(x):
             bins = torch.FloatTensor([1e-8,1e-6,1e-4,1e-2,1,1e2,1e4,1e6]).to(x.device)
-            decay_factor = 1e-6
-            dist = torch.abs(x).unsqueeze(-1) - bins
+            decay_factor = 1e-4
+            dist = torch.abs(torch.abs(x).unsqueeze(-1) - bins)
             _,min_idx = dist.min(dim=-1)
-            offsets = 0#bins[min_idx]*decay_factor
+            offsets = bins[min_idx]*decay_factor
             x = torch.sign(x) * (torch.abs(x) - offsets)
             return x
         for module, name in self.conv_names.items():
