@@ -480,7 +480,7 @@ class FisherPruningHook():
         def exp_quantization(x):
             x = torch.clamp(x, min=1e-6)
             bins = torch.FloatTensor([1e-6,1e-4,1e-2,1,1e2,1e4,1e6]).to(x.device)
-            decay_factor = 1e-2
+            decay_factor = 1e-4
             dist = torch.abs(torch.log10(torch.abs(x)).unsqueeze(-1) - torch.log10(bins))
             _,min_idx = dist.min(dim=-1)
             # add
