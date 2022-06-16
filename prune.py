@@ -489,7 +489,6 @@ class FisherPruningHook():
             offset = bins[min_idx] - torch.abs(x)
             x = torch.sign(x) * (torch.abs(x) + decay_factor * offset)
             self.ista_err += torch.abs(offset/bins[min_idx]).mean()
-            ista_cnt += 1
             return x
             
         def exp_quantization_mult(x):
@@ -503,12 +502,12 @@ class FisherPruningHook():
             offset = bins[min_idx] - torch.abs(x)
             x = torch.sign(x) * (torch.abs(x) + decay_factor * offset)
             self.ista_err += torch.abs(offset).mean()
-            ista_cnt += 1
             return x
             
         for module, name in self.conv_names.items():
             if self.group_modules is not None and module in self.group_modules:
                 continue
+            ista_cnt += 1
             with torch.no_grad():
                 # weight
                 module.weight.data = exp_quantization_add(module.weight)
@@ -517,6 +516,7 @@ class FisherPruningHook():
         for group in self.groups:
             mask_len = len(self.groups[group][0].in_mask.view(-1))
             for module in self.groups[group]:
+                ista_cnt += 1
                 with torch.no_grad():
                     module.weight.data = exp_quantization_add(module.weight)
                     #module.weight.grad = exp_quantization(module.weight.grad)
