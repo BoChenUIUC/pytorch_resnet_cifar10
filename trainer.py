@@ -283,7 +283,7 @@ def validate(val_loader, model, criterion, hook):
     print(' * Prec@1 {top1.avg:.3f}'
           .format(top1=top1))
           
-    print_str = f"{top1.avg:.3f}_{loss.avg:.4f}"
+    print_str = f"{top1.avg:.3f}_{losses.avg:.4f}"
     hook.plot(print_str)
 
     return top1.avg
