@@ -484,11 +484,11 @@ class FisherPruningHook():
             dist = torch.abs(torch.log10(torch.abs(x)).unsqueeze(-1) - torch.log10(bins))
             _,min_idx = dist.min(dim=-1)
             # add
-            # offset = decay_factor * torch.sign(bins[min_idx] - torch.abs(x))
-            #x = torch.sign(x) * (torch.abs(x) + offset)
+            offset = bins[min_idx] - torch.abs(x)
+            x = torch.sign(x) * (torch.abs(x) + decay_factor * offset)
             # or mult
-            offset = torch.log10(bins[min_idx]/torch.abs(x)) * decay_factor
-            x *= torch.pow(10, offset)
+            #offset = torch.log10(bins[min_idx]/torch.abs(x))
+            #x *= torch.pow(10, offset * (1 - ))
             return x
         for module, name in self.conv_names.items():
             if self.group_modules is not None and module in self.group_modules:
