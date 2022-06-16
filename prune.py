@@ -482,7 +482,7 @@ class FisherPruningHook():
             decay_factor = 1e-6
             dist = torch.abs(x).unsqueeze(-1) - bins
             _,min_idx = dist.min(dim=-1)
-            offsets = bins[min_idx]*decay_factor
+            offsets = 0#bins[min_idx]*decay_factor
             x = torch.sign(x) * (torch.abs(x) - offsets)
             return x
         for module, name in self.conv_names.items():
