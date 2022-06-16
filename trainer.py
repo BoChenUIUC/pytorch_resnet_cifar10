@@ -221,7 +221,7 @@ def train(train_loader, model, criterion, optimizer, epoch, hook):
                 print('Epoch: [{0}][{1}/{2}]\t'
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                       'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
-                      'F: {hook.total_flops:.4f}. A: {hook.total_acts:.4f}'.format(
+                      'F: {hook.total_flops:.4f}. A: {hook.total_acts:.4f}. E: {hook.ista_err:.4f}'.format(
                           epoch, i, len(train_loader), loss=losses, top1=top1, hook=hook))
             else:
                 print('Epoch: [{0}][{1}/{2}]\t'
@@ -281,7 +281,7 @@ def validate(val_loader, model, criterion, hook):
     print(' * Prec@1 {top1.avg:.3f}'
           .format(top1=top1))
           
-    print_str = f"{top1.avg:.3f}_{losses.avg:.4f}"
+    print_str = f"{top1.avg:.3f}_{losses.avg:.4f}_{hook.ista_err:.4f}"
     hook.plot(print_str)
 
     return top1.avg
