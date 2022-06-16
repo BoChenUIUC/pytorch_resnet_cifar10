@@ -488,7 +488,7 @@ class FisherPruningHook():
             _,min_idx = dist.min(dim=-1)
             offset = bins[min_idx] - torch.abs(x)
             x = torch.sign(x) * (torch.abs(x) + decay_factor * offset)
-            self.ista_err += torch.abs(offset/bins[min_idx]).mean()
+            self.ista_err += torch.abs(torch.log(bins[min_idx]/torch.abs(x))).mean()
             return x
             
         def exp_quantization_mult(x):
