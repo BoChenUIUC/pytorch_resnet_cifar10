@@ -479,15 +479,17 @@ class FisherPruningHook():
                 
     def ista(self):
         self.ista_err = torch.tensor([0.0]).cuda(0)
+        ista_cnt = torch.tensor([0.0]).cuda(0)
         
         def exp_quantization_add(x):
-            bins = torch.FloatTensor([0,1e-8,1e-6,1e-4,1e-2,1,1e2,1e4,1e6]).to(x.device)
+            bins = torch.FloatTensor([1e-8,1e-6,1e-4,1e-2,1,1e2,1e4,1e6]).to(x.device)
             decay_factor = 1e-2
             dist = torch.abs(torch.abs(x).unsqueeze(-1) - bins)
             _,min_idx = dist.min(dim=-1)
             offset = bins[min_idx] - torch.abs(x)
             x = torch.sign(x) * (torch.abs(x) + decay_factor * offset)
-            self.ista_err += torch.abs(offset).mean()
+            self.ista_err += torch.abs(offset/bins[min_idx]).mean()
+            ista_cnt += 1
             return x
             
         def exp_quantization_mult(x):
@@ -499,6 +501,7 @@ class FisherPruningHook():
             offset = torch.log(bins[min_idx]/torch.abs(x))
             x *= torch.exp(offset * decay_factor)
             self.ista_err += torch.abs(offset).mean()
+            ista_cnt += 1
             return x
             
         for module, name in self.conv_names.items():
@@ -515,6 +518,8 @@ class FisherPruningHook():
                 with torch.no_grad():
                     module.weight.data = exp_quantization_mult(module.weight)
                     #module.weight.grad = exp_quantization(module.weight.grad)
+                    
+        self.ista_err /= ista_cnt
     
     def add_noise_mask(self):
         sorted, indices = self.fisher_list.sort(dim=0)
