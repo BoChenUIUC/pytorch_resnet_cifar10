@@ -218,12 +218,12 @@ def train(train_loader, model, criterion, optimizer, epoch, hook):
 
         if i % args.print_freq == 0:
             if hook is not None:
-                print(hook.ista_err.cpu().item())
+                ista_err = hook.ista_err.cpu().item()
                 print('Epoch: [{0}][{1}/{2}]\t'
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                       'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
-                      'F: {hook.total_flops:.4f}. A: {hook.total_acts:.4f}. E: {hook.ista_err.cpu().item():.4f}'.format(
-                          epoch, i, len(train_loader), loss=losses, top1=top1, hook=hook))
+                      'F: {hook.total_flops:.4f}. A: {hook.total_acts:.4f}. E: {ista_err:.4f}'.format(
+                          epoch, i, len(train_loader), loss=losses, top1=top1, hook=hook, ista_err=ista_err))
             else:
                 print('Epoch: [{0}][{1}/{2}]\t'
                       'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
@@ -282,7 +282,8 @@ def validate(val_loader, model, criterion, hook):
     print(' * Prec@1 {top1.avg:.3f}'
           .format(top1=top1))
           
-    print_str = f"{top1.avg:.3f}_{losses.avg:.4f}_{hook.ista_err:.4f}"
+    ista_err = hook.ista_err.cpu().item()
+    print_str = f"{top1.avg:.3f}_{losses.avg:.4f}_{ista_err:.4f}"
     hook.plot(print_str)
 
     return top1.avg
