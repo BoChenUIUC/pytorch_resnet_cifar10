@@ -881,7 +881,6 @@ class FisherPruningHook():
                 will make conv's forward behave differently.
         """
         # same group same softmask
-        module.noise_mask = self.noise_mask
         module.finetune = not pruning
         if type(module).__name__ == 'Conv2d':
             all_ones = module.weight.new_ones(module.in_channels,)
