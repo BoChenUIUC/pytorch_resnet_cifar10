@@ -218,21 +218,21 @@ class FisherPruningHook():
                 #plt.figure(1)
                 self.fisher_list[self.fisher_list==0] = 1e-50
                 self.fisher_list = torch.log10(self.fisher_list).detach().cpu().numpy()
-                sns.displot(self.fisher_list, kind='hist', aspect=1.2, ax=axs[0])
+                sns.histplot(self.fisher_list, ax=axs[0])
                 #plt.savefig(save_dir + f'dist_fisher_{self.iter}_{loss:.3f}.png')
                 # magnitude
                 #plt.figure(2)
                 self.mag_list[self.mag_list==0] = 1e-50
                 self.mag_list = torch.log10(self.mag_list).detach().cpu().numpy()
-                sns.displot(self.mag_list, kind='hist', aspect=1.2, ax=axs[1])
+                sns.histplot(self.mag_list, ax=axs[1])
                 #plt.savefig(save_dir + f'dist_mag_{self.iter}.png')
                 # gradient
                 #plt.figure(3)
                 self.grad_list[self.grad_list==0] = 1e-50
                 self.grad_list = torch.log10(self.grad_list).detach().cpu().numpy()
-                sns.displot(self.grad_list, kind='hist', aspect=1.2, ax=axs[2])
+                sns.histplot(self.grad_list, ax=axs[2])
                 #plt.savefig(save_dir + f'dist_grad_{self.iter}.png')
-                plt.savefig(save_dir + f'{self.iter}_{loss:.3f}.png')
+                fig.savefig(save_dir + f'{self.iter}_{loss:.3f}.png')
                 self.iter += 1
         self.init_flops_acts()
 
