@@ -222,7 +222,7 @@ class FisherPruningHook():
         if self.penalty is not None:
             save_dir = f'metrics/L{int(-math.log10(max(1e-8,abs(self.penalty[0]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[1]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[2]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[3]))))}/'
         else:
-            save_dir = f'metrics/mult_mag2/'
+            save_dir = f'metrics/add_mag2/'
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         fig, axs = plt.subplots(ncols=3, figsize=(30, 8))
@@ -498,8 +498,10 @@ class FisherPruningHook():
             decay_factor = 1e-2
             dist = torch.abs(torch.log10(torch.abs(x).unsqueeze(-1)) - torch.log10(bins))
             _,min_idx = dist.min(dim=-1)
-            offset = torch.log(bins[min_idx]/torch.abs(x))
-            x *= torch.exp(offset * decay_factor)
+            #offset = torch.log(bins[min_idx]/torch.abs(x))
+            #x *= torch.exp(offset * decay_factor)
+            offset = bins[min_idx] - torch.abs(x)
+            x = torch.sign(x) * (torch.abs(x) + decay_factor * offset)
             self.ista_err += torch.abs(offset).mean()
             ista_cnt += 1
             return x
@@ -509,14 +511,14 @@ class FisherPruningHook():
                 continue
             with torch.no_grad():
                 # weight
-                module.weight.data = exp_quantization_mult(module.weight)
+                module.weight.data = exp_quantization_add(module.weight)
                 # grad
                 #module.weight.grad = exp_quantization(module.weight.grad)
         for group in self.groups:
             mask_len = len(self.groups[group][0].in_mask.view(-1))
             for module in self.groups[group]:
                 with torch.no_grad():
-                    module.weight.data = exp_quantization_mult(module.weight)
+                    module.weight.data = exp_quantization_add(module.weight)
                     #module.weight.grad = exp_quantization(module.weight.grad)
                     
         self.ista_err /= ista_cnt
