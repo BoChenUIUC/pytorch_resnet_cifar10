@@ -477,17 +477,24 @@ class FisherPruningHook():
                 module.in_mask[channel] = 0
                 
     def ista(self):
-        gamma = 1e-6
+        def exp_quantization(x):
+            bins = torch.FloatTensor([1e-4,1e-2,1,1e2])
+            decay_factor = 1e-4
+            dist = torch.abs(x).unsqueeze(-1) - bins
+            _,min_idx = dist.min(dim=-1)
+            offsets = bins[min_idx]*decay_factor
+            x = torch.sign(x) * (torch.abs(x) - offsets)
+            return x
         for module, name in self.conv_names.items():
             if self.group_modules is not None and module in self.group_modules:
                 continue
             with torch.no_grad():
-                module.weight.data = torch.clamp((torch.abs(module.weight) - gamma), min=0.) * torch.sign(module.weight)
+                module.weight.data = exp_quantization(module.weight)
         for group in self.groups:
             mask_len = len(self.groups[group][0].in_mask.view(-1))
             for module in self.groups[group]:
                 with torch.no_grad():
-                    module.weight.data = torch.clamp((torch.abs(module.weight) - gamma), min=0.) * torch.sign(module.weight)
+                    module.weight.data = exp_quantization(module.weight)
     
     def add_noise_mask(self):
         sorted, indices = self.fisher_list.sort(dim=0)
