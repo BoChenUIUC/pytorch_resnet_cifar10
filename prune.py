@@ -190,7 +190,7 @@ class FisherPruningHook():
 
         self.print_model(model, print_flops_acts=False, print_channel=False)
 
-    def after_backward(self, itr, model, loss):
+    def after_backward(self, itr, model):
         if not self.pruning:
             return
         # compute fisher
@@ -205,35 +205,39 @@ class FisherPruningHook():
             self.channel_prune()
             self.init_accum_fishers()
             self.total_flops, self.total_acts = self.update_flop_act(model)
-            # plot figure
-            if itr == 0:
-                if self.penalty is not None:
-                    save_dir = f'metrics/L{int(-math.log10(max(1e-8,abs(self.penalty[0]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[1]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[2]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[3]))))}/'
-                else:
-                    save_dir = f'metrics/base/'
-                if not os.path.exists(save_dir):
-                    os.makedirs(save_dir)
-                fig, axs = plt.subplots(ncols=3, figsize=(30, 8))
-                # fisher
-                #plt.figure(1)
-                self.fisher_list[self.fisher_list==0] = 1e-50
-                self.fisher_list = torch.log10(self.fisher_list).detach().cpu().numpy()
-                sns.histplot(self.fisher_list, ax=axs[0])
-                #plt.savefig(save_dir + f'dist_fisher_{self.iter}_{loss:.3f}.png')
-                # magnitude
-                #plt.figure(2)
-                self.mag_list[self.mag_list==0] = 1e-50
-                self.mag_list = torch.log10(self.mag_list).detach().cpu().numpy()
-                sns.histplot(self.mag_list, ax=axs[1])
-                #plt.savefig(save_dir + f'dist_mag_{self.iter}.png')
-                # gradient
-                #plt.figure(3)
-                self.grad_list[self.grad_list==0] = 1e-50
-                self.grad_list = torch.log10(self.grad_list).detach().cpu().numpy()
-                sns.histplot(self.grad_list, ax=axs[2])
-                #plt.savefig(save_dir + f'dist_grad_{self.iter}.png')
-                fig.savefig(save_dir + f'{self.iter}_{loss:.3f}.png')
-                self.iter += 1
+        self.init_flops_acts()
+        
+    def plot(self, print_str):
+        # compute fisher
+        for module, name in self.conv_names.items():
+            self.compute_fisher_backward(module)
+        # do pruning every interval
+        self.group_fishers()
+        self.accumulate_fishers()
+        self.init_temp_fishers()
+        # this makes sure model is converged before each pruning
+        self.channel_prune()
+        self.init_accum_fishers()
+        # plot figure
+        if self.penalty is not None:
+            save_dir = f'metrics/L{int(-math.log10(max(1e-8,abs(self.penalty[0]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[1]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[2]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[3]))))}/'
+        else:
+            save_dir = f'metrics/base/'
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+        fig, axs = plt.subplots(ncols=3, figsize=(30, 8))
+        # fisher
+        self.fisher_list[self.fisher_list==0] = 1e-10
+        self.fisher_list = torch.log10(self.fisher_list).detach().cpu().numpy()
+        sns.histplot(self.fisher_list, ax=axs[0])
+        self.grad_list[self.grad_list==0] = 1e-10
+        self.grad_list = torch.log10(self.grad_list).detach().cpu().numpy()
+        sns.histplot(self.grad_list, ax=axs[1])
+        self.mag_list[self.mag_list==0] = 1e-10
+        self.mag_list = torch.log10(self.mag_list).detach().cpu().numpy()
+        sns.histplot(self.mag_list, ax=axs[2])
+        fig.savefig(save_dir + f'{self.iter}_{print_str}.png')
+        self.iter += 1
         self.init_flops_acts()
 
     def update_flop_act(self, model, work_dir='work_dir/'):

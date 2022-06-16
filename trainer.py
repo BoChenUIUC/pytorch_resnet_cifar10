@@ -149,7 +149,7 @@ def main():
         lr_scheduler.step()
 
         # evaluate on validation set
-        prec1 = validate(val_loader, model, criterion)
+        prec1 = validate(val_loader, model, criterion, hook if args.prune else None)
         continue
         # remember best prec@1 and save checkpoint
         is_best = prec1 > best_prec1
@@ -216,7 +216,7 @@ def train(train_loader, model, criterion, optimizer, epoch, hook):
         # if pruning
         if hook is not None:
             # backward the regularization function
-            hook.after_backward(i, model, top1.avg)
+            hook.after_backward(i, model)
 
         if i % args.print_freq == 0:
             if hook is not None:
@@ -235,7 +235,7 @@ def train(train_loader, model, criterion, optimizer, epoch, hook):
                           data_time=data_time, loss=losses, top1=top1))
 
 
-def validate(val_loader, model, criterion):
+def validate(val_loader, model, criterion, hook):
     """
     Run evaluation
     """
@@ -282,6 +282,9 @@ def validate(val_loader, model, criterion):
 
     print(' * Prec@1 {top1.avg:.3f}'
           .format(top1=top1))
+          
+    print_str = f"{top1.avg:.3f}_{loss.avg:.4f}"
+    hook.plot(print_str)
 
     return top1.avg
 
