@@ -227,13 +227,13 @@ class FisherPruningHook():
             os.makedirs(save_dir)
         fig, axs = plt.subplots(ncols=3, figsize=(30, 8))
         # fisher
-        self.fisher_list[self.fisher_list==0] = 1e-10
+        self.fisher_list[self.fisher_list==0] = 1e-30
         self.fisher_list = torch.log10(self.fisher_list).detach().cpu().numpy()
         sns.histplot(self.fisher_list, ax=axs[0])
-        self.grad_list[self.grad_list==0] = 1e-10
+        self.grad_list[self.grad_list==0] = 1e-30
         self.grad_list = torch.log10(self.grad_list).detach().cpu().numpy()
         sns.histplot(self.grad_list, ax=axs[1])
-        self.mag_list[self.mag_list==0] = 1e-10
+        self.mag_list[self.mag_list==0] = 1e-30
         self.mag_list = torch.log10(self.mag_list).detach().cpu().numpy()
         sns.histplot(self.mag_list, ax=axs[2])
         fig.savefig(save_dir + f'{self.iter}_{print_str}.png')
@@ -477,10 +477,9 @@ class FisherPruningHook():
                 module.in_mask[channel] = 0
                 
     def ista(self):
-        return
         def exp_quantization(x):
             #x = torch.clamp(x, min=1e-6)
-            bins = torch.FloatTensor([1e-6,1e-4,1e-2,1,1e2,1e4,1e6]).to(x.device)
+            bins = torch.FloatTensor([0,1e-8,1e-6,1e-4,1e-2,1,1e2,1e4,1e6]).to(x.device)
             decay_factor = 1e-3
             dist = torch.abs(torch.abs(x).unsqueeze(-1) - bins)
             _,min_idx = dist.min(dim=-1)
@@ -492,12 +491,16 @@ class FisherPruningHook():
             if self.group_modules is not None and module in self.group_modules:
                 continue
             with torch.no_grad():
-                module.weight.data = exp_quantization(module.weight)
+                # weight
+                #module.weight.data = exp_quantization(module.weight)
+                # grad
+                module.weight.grad = exp_quantization(module.weight.grad)
         for group in self.groups:
             mask_len = len(self.groups[group][0].in_mask.view(-1))
             for module in self.groups[group]:
                 with torch.no_grad():
-                    module.weight.data = exp_quantization(module.weight)
+                    #module.weight.data = exp_quantization(module.weight)
+                    module.weight.grad = exp_quantization(module.weight.grad)
     
     def add_noise_mask(self):
         sorted, indices = self.fisher_list.sort(dim=0)
