@@ -484,11 +484,11 @@ class FisherPruningHook():
                 module.in_mask[channel] = 0
                 
     def ista(self):
-        return
         self.ista_err = torch.tensor([0.0]).cuda(0)
         num_bins = 10
         self.ista_err_bins = [0 for _ in range(num_bins)]
         ista_cnt = torch.tensor([0.0]).cuda(0)
+        return
         
         def exp_quantization_add(x):
             bins = torch.FloatTensor([1e-8,1e-6,1e-4,1e-2,1,1e2,1e4,1e6]).to(x.device)
