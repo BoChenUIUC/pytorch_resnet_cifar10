@@ -510,21 +510,12 @@ class FisherPruningHook():
             return x
             
         def adapt_ista(x, cost):
-            ista_idx = self.cost_values.index(cost)
+            #ista_idx = self.cost_values.index(cost)
             # larger index should get larger mean for larger distance
             # already large distance needs little influence on distribution
-            bins = torch.pow(10,torch.tensor([-2.5,1.5])).to(x.device)
-            decay_factor = 1e-3
+            decay_factor = 1e-4
             dist = torch.abs(torch.log(torch.abs(x).unsqueeze(-1)/bins))
-            _,min_idx = dist.min(dim=-1)
-            offset = bins[min_idx] - torch.abs(x)
-            x = torch.sign(x) * (torch.abs(x) + decay_factor * bins[min_idx])
-            all_err = torch.abs(torch.log(bins[min_idx]/torch.abs(x)))
-            self.ista_err += all_err.mean()
-            # calculating err for each bin
-            for i in range(num_bins):
-                if torch.sum(min_idx==i)>0:
-                    self.ista_err_bins[i] += all_err[min_idx==i].mean().cpu().item()
+            x = torch.sign(x) * torch.clamp((torch.abs(x) - decay_factor), min=0.) 
             return x
             
         for module, name in self.conv_names.items():
@@ -540,9 +531,9 @@ class FisherPruningHook():
                 with torch.no_grad():
                     module.weight.data = adapt_ista(module.weight,module.cost)
                     
-        self.ista_err /= ista_cnt
-        for i in range(num_bins):
-            self.ista_err_bins[i] /= int(ista_cnt)
+        #self.ista_err /= ista_cnt
+        #for i in range(num_bins):
+        #    self.ista_err_bins[i] /= int(ista_cnt)
     
     def add_noise_mask(self):
         sorted, indices = self.fisher_list.sort(dim=0)
