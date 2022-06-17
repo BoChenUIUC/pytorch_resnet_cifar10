@@ -421,7 +421,7 @@ class FisherPruningHook():
                 for ancestor in ancestors:
                     delta_acts += self.acts[ancestor] / ancestor.out_channels
                 fisher /= (float(max(delta_acts, 1.)) / 1e6)
-                #mag /= (float(max(delta_acts, 1.)) / 1e6)
+                mag /= (float(max(delta_acts, 1.)) / 1e6)
                 grad /= (float(max(delta_acts, 1.)) / 1e6)
             self.fisher_list = torch.cat((self.fisher_list,fisher[in_mask.bool()].view(-1)))
             self.mag_list = torch.cat((self.mag_list,mag[in_mask.bool()].view(-1)))
@@ -455,7 +455,7 @@ class FisherPruningHook():
                 grad /= float(self.flops[group] / 1e9)
             elif self.delta == 'acts':
                 fisher /= float(self.acts[group] / 1e6)
-                #mag /= float(self.acts[group] / 1e6)
+                mag /= float(self.acts[group] / 1e6)
                 grad /= float(self.acts[group] / 1e6)
             self.fisher_list = torch.cat((self.fisher_list,fisher[in_mask.bool()].view(-1)))
             self.mag_list = torch.cat((self.mag_list,mag[in_mask.bool()].view(-1)))
@@ -495,7 +495,8 @@ class FisherPruningHook():
             
         def exp_quantization_mult(x):
             x = torch.clamp(torch.abs(x), min=1e-8) * torch.sign(x)
-            bins = torch.FloatTensor([1e-8,1e-6,1e-4,1e-2,1,1e2,1e4,1e6]).to(x.device)
+            #bins = torch.FloatTensor([1e-8,1e-6,1e-4,1e-2,1,1e2,1e4,1e6]).to(x.device)
+            bins = torch.pow(10,torch.tensor([-1,-0.5,0,0.5,1,1.5,2,2.5])).to(x.device)
             decay_factor = 1e-3
             dist = torch.abs(torch.log(torch.abs(x).unsqueeze(-1)/bins))
             _,min_idx = dist.min(dim=-1)
