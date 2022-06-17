@@ -510,7 +510,7 @@ class FisherPruningHook():
             ista_cnt += 1
             with torch.no_grad():
                 # weight
-                module.weight.data = exp_quantization_mult(module.weight)
+                module.weight.data = exp_quantization_add(module.weight)
                 # grad
                 #module.weight.grad = exp_quantization(module.weight.grad)
         for group in self.groups:
@@ -518,7 +518,7 @@ class FisherPruningHook():
             for module in self.groups[group]:
                 ista_cnt += 1
                 with torch.no_grad():
-                    module.weight.data = exp_quantization_mult(module.weight)
+                    module.weight.data = exp_quantization_add(module.weight)
                     #module.weight.grad = exp_quantization(module.weight.grad)
                     
         self.ista_err /= ista_cnt
