@@ -491,9 +491,6 @@ class FisherPruningHook():
             x = torch.sign(x) * (torch.abs(x) + decay_factor * offset)
             all_err = torch.abs(torch.log(bins[min_idx]/torch.abs(x)))
             self.ista_err += all_err.mean()
-            # calculating err for each bin
-            for i in range(8):
-                self.ista_err_bins[i] += all_err[min_idx==i].mean().cpu().item()
             return x
             
         def exp_quantization_mult(x):
@@ -533,7 +530,7 @@ class FisherPruningHook():
                     
         self.ista_err /= ista_cnt
         for i in range(8):
-            self.ista_err_bins[i] /= ista_cnt
+            self.ista_err_bins[i] /= int(ista_cnt)
     
     def add_noise_mask(self):
         sorted, indices = self.fisher_list.sort(dim=0)
