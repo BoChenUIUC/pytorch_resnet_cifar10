@@ -222,7 +222,7 @@ class FisherPruningHook():
         if self.penalty is not None:
             save_dir = f'metrics/L{int(-math.log10(max(1e-8,abs(self.penalty[0]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[1]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[2]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[3]))))}/'
         else:
-            save_dir = f'metrics/add_mag3/'
+            save_dir = f'metrics/mult_mag3/'
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         fig, axs = plt.subplots(ncols=3, figsize=(30, 8))
@@ -479,6 +479,7 @@ class FisherPruningHook():
                 
     def ista(self):
         self.ista_err = torch.tensor([0.0]).cuda(0)
+        self.ista_err_bins = [0 for _ in range(8)]
         ista_cnt = torch.tensor([0.0]).cuda(0)
         
         def exp_quantization_add(x):
@@ -488,20 +489,28 @@ class FisherPruningHook():
             _,min_idx = dist.min(dim=-1)
             offset = bins[min_idx] - torch.abs(x)
             x = torch.sign(x) * (torch.abs(x) + decay_factor * offset)
-            self.ista_err += torch.abs(torch.log(bins[min_idx]/torch.abs(x))).mean()
+            all_err = torch.abs(torch.log(bins[min_idx]/torch.abs(x)))
+            self.ista_err += all_err.mean()
+            # calculating err for each bin
+            for i in range(8):
+                self.ista_err_bins[i] += all_err[min_idx==i].mean().cpu().item()
             return x
             
         def exp_quantization_mult(x):
             x = torch.clamp(torch.abs(x), min=1e-8) * torch.sign(x)
             bins = torch.FloatTensor([1e-8,1e-6,1e-4,1e-2,1,1e2,1e4,1e6]).to(x.device)
             decay_factor = 1e-3
-            dist = torch.abs(torch.log10(torch.abs(x).unsqueeze(-1)) - torch.log10(bins))
+            dist = torch.abs(torch.log(torch.abs(x).unsqueeze(-1)/bins))
             _,min_idx = dist.min(dim=-1)
             #offset = torch.log(bins[min_idx]/torch.abs(x))
             #x *= torch.exp(offset * decay_factor)
             offset = bins[min_idx] - torch.abs(x)
-            x = torch.sign(x) * (torch.abs(x) + decay_factor * offset)
-            self.ista_err += torch.abs(torch.log(bins[min_idx]/torch.abs(x))).mean()
+            x = torch.sign(x) * (torch.abs(x) + decay_factor * bins[min_idx])
+            all_err = torch.abs(torch.log(bins[min_idx]/torch.abs(x)))
+            self.ista_err += all_err.mean()
+            # calculating err for each bin
+            for i in range(8):
+                self.ista_err_bins[i] += all_err[min_idx==i].mean().cpu().item()
             return x
             
         for module, name in self.conv_names.items():
@@ -510,7 +519,7 @@ class FisherPruningHook():
             ista_cnt += 1
             with torch.no_grad():
                 # weight
-                module.weight.data = exp_quantization_add(module.weight)
+                module.weight.data = exp_quantization_mult(module.weight)
                 # grad
                 #module.weight.grad = exp_quantization(module.weight.grad)
         for group in self.groups:
@@ -518,10 +527,12 @@ class FisherPruningHook():
             for module in self.groups[group]:
                 ista_cnt += 1
                 with torch.no_grad():
-                    module.weight.data = exp_quantization_add(module.weight)
+                    module.weight.data = exp_quantization_mult(module.weight)
                     #module.weight.grad = exp_quantization(module.weight.grad)
                     
         self.ista_err /= ista_cnt
+        for i in range(8):
+            self.ista_err_bins[i] /= ista_cnt
     
     def add_noise_mask(self):
         sorted, indices = self.fisher_list.sort(dim=0)
