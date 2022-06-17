@@ -702,6 +702,8 @@ class FisherPruningHook():
             def compute_mag(input, grad_input, layer_name):
                 # information per mask channel per module
                 grads = torch.abs(input)
+                print(grads.size())
+                exit(0)
                 if layer_name in ['Conv2d']:
                     grads = grads.sum(-1).sum(-1).sum(0)
                 else:
