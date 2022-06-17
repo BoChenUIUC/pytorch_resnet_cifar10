@@ -421,8 +421,9 @@ class FisherPruningHook():
                 for ancestor in ancestors:
                     delta_acts += self.acts[ancestor] / ancestor.out_channels
                 fisher /= (float(max(delta_acts, 1.)) / 1e6)
+                grad = mag
                 mag /= (float(max(delta_acts, 1.)) / 1e6)
-                grad /= (float(max(delta_acts, 1.)) / 1e6)
+                #grad /= (float(max(delta_acts, 1.)) / 1e6)
             self.fisher_list = torch.cat((self.fisher_list,fisher[in_mask.bool()].view(-1)))
             self.mag_list = torch.cat((self.mag_list,mag[in_mask.bool()].view(-1)))
             self.grad_list = torch.cat((self.grad_list,grad[in_mask.bool()].view(-1)))
@@ -455,8 +456,9 @@ class FisherPruningHook():
                 grad /= float(self.flops[group] / 1e9)
             elif self.delta == 'acts':
                 fisher /= float(self.acts[group] / 1e6)
+                grad = mag
                 mag /= float(self.acts[group] / 1e6)
-                grad /= float(self.acts[group] / 1e6)
+                #grad /= float(self.acts[group] / 1e6)
             self.fisher_list = torch.cat((self.fisher_list,fisher[in_mask.bool()].view(-1)))
             self.mag_list = torch.cat((self.mag_list,mag[in_mask.bool()].view(-1)))
             self.grad_list = torch.cat((self.grad_list,grad[in_mask.bool()].view(-1)))
