@@ -425,6 +425,7 @@ class FisherPruningHook():
                 #grad /= (float(max(delta_acts, 1.)) / 1e6)
                 # test
                 fisher[:] = 1./(float(max(delta_acts, 1.)) / 1e6)
+                self.cost_values.add(1./float(self.acts[group] / 1e6))
                 grad = mag/(float(max(delta_acts, 1.)) / 1e6)
             self.fisher_list = torch.cat((self.fisher_list,fisher[in_mask.bool()].view(-1)))
             self.mag_list = torch.cat((self.mag_list,mag[in_mask.bool()].view(-1)))
@@ -444,7 +445,7 @@ class FisherPruningHook():
         self.fisher_list = torch.tensor([]).cuda()
         self.mag_list = torch.tensor([]).cuda()
         self.grad_list = torch.tensor([]).cuda()
-        self.fisher_reg = None
+        self.cost_values = set()
         info.update(self.single_prune(info, self.group_modules))
         for group in self.groups:
             # they share the same in mask
@@ -462,11 +463,15 @@ class FisherPruningHook():
                 #grad /= float(self.acts[group] / 1e6)
                 # test
                 fisher[:] = 1./float(self.acts[group] / 1e6)
+                self.cost_values.add(1./float(self.acts[group] / 1e6))
                 grad = mag/float(self.acts[group] / 1e6)
+                # test
             self.fisher_list = torch.cat((self.fisher_list,fisher[in_mask.bool()].view(-1)))
             self.mag_list = torch.cat((self.mag_list,mag[in_mask.bool()].view(-1)))
             self.grad_list = torch.cat((self.grad_list,grad[in_mask.bool()].view(-1)))
             info.update(self.find_pruning_channel(group, fisher, in_mask, info))
+        print(self.cost_values)
+        exit(0)
                 
         module, channel = info['module'], info['channel']
         if self.penalty is not None:
@@ -752,8 +757,6 @@ class FisherPruningHook():
         def compute_mag(weight, grad_weight, layer_name):
             # information per mask channel per module
             grads = torch.abs(weight)
-            print(grads.size())
-            exit(0)
             if layer_name in ['Conv2d']:
                 grads = grads.sum(-1).sum(-1).sum(0)
             else:
