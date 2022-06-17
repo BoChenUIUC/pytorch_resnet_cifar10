@@ -510,10 +510,8 @@ class FisherPruningHook():
             self.ista_err += all_err.mean()
             # calculating err for each bin
             for i in range(8):
-                err = all_err[min_idx==i].mean().cpu().item()
-                self.ista_err_bins[i] += err
-                print(err,i)
-            exit(0)
+                if torch.sum(min_idx==i)>0:
+                    self.ista_err_bins[i] += all_err[min_idx==i].mean().cpu().item()
             return x
             
         for module, name in self.conv_names.items():
