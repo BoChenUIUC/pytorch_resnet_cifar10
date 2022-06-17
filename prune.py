@@ -222,7 +222,7 @@ class FisherPruningHook():
         if self.penalty is not None:
             save_dir = f'metrics/L{int(-math.log10(max(1e-8,abs(self.penalty[0]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[1]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[2]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[3]))))}/'
         else:
-            save_dir = f'metrics/mult_mag3/'
+            save_dir = f'metrics/adapt_ista/'
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         fig, axs = plt.subplots(ncols=3, figsize=(30, 8))
@@ -427,6 +427,7 @@ class FisherPruningHook():
                 fisher[:] = 1./(float(max(delta_acts, 1.)) / 1e6)
                 self.cost_values.add(1./(float(max(delta_acts, 1.)) / 1e6))
                 grad = mag/(float(max(delta_acts, 1.)) / 1e6)
+                module.cost = 1./(float(max(delta_acts, 1.)) / 1e6)
             self.fisher_list = torch.cat((self.fisher_list,fisher[in_mask.bool()].view(-1)))
             self.mag_list = torch.cat((self.mag_list,mag[in_mask.bool()].view(-1)))
             self.grad_list = torch.cat((self.grad_list,grad[in_mask.bool()].view(-1)))
@@ -465,13 +466,16 @@ class FisherPruningHook():
                 fisher[:] = 1./float(self.acts[group] / 1e6)
                 self.cost_values.add(1./float(self.acts[group] / 1e6))
                 grad = mag/float(self.acts[group] / 1e6)
+                for module in self.groups[group]:
+                    module.cost = 1./float(self.acts[group] / 1e6)
                 # test
             self.fisher_list = torch.cat((self.fisher_list,fisher[in_mask.bool()].view(-1)))
             self.mag_list = torch.cat((self.mag_list,mag[in_mask.bool()].view(-1)))
             self.grad_list = torch.cat((self.grad_list,grad[in_mask.bool()].view(-1)))
             info.update(self.find_pruning_channel(group, fisher, in_mask, info))
-        print(self.cost_values)
-        exit(0)
+            
+        # sort cost values
+        self.cost_values = sorted(self.cost_values)
                 
         module, channel = info['module'], info['channel']
         if self.penalty is not None:
@@ -490,10 +494,9 @@ class FisherPruningHook():
                 
     def ista(self):
         self.ista_err = torch.tensor([0.0]).cuda(0)
-        num_bins = 10
+        num_bins = 2
         self.ista_err_bins = [0 for _ in range(num_bins)]
         ista_cnt = torch.tensor([0.0]).cuda(0)
-        return
         
         def exp_quantization_add(x):
             bins = torch.FloatTensor([1e-8,1e-6,1e-4,1e-2,1,1e2,1e4,1e6]).to(x.device)
@@ -506,15 +509,14 @@ class FisherPruningHook():
             self.ista_err += all_err.mean()
             return x
             
-        def exp_quantization_mult(x):
-            x = torch.clamp(torch.abs(x), min=1e-8) * torch.sign(x)
-            #bins = torch.FloatTensor([1e-8,1e-6,1e-4,1e-2,1,1e2,1e4,1e6]).to(x.device)
-            bins = torch.pow(10,torch.tensor([-3,-2.5,-2,-1.5,-1,-0.5,0,0.5,1,1.5])).to(x.device)
+        def adapt_ista(x, cost):
+            ista_idx = self.cost_values.index(cost)
+            # larger index should get larger mean for larger distance
+            # already large distance needs little influence on distribution
+            bins = torch.pow(10,torch.tensor([-2.5,1.5])).to(x.device)
             decay_factor = 1e-3
             dist = torch.abs(torch.log(torch.abs(x).unsqueeze(-1)/bins))
             _,min_idx = dist.min(dim=-1)
-            #offset = torch.log(bins[min_idx]/torch.abs(x))
-            #x *= torch.exp(offset * decay_factor)
             offset = bins[min_idx] - torch.abs(x)
             x = torch.sign(x) * (torch.abs(x) + decay_factor * bins[min_idx])
             all_err = torch.abs(torch.log(bins[min_idx]/torch.abs(x)))
@@ -530,17 +532,13 @@ class FisherPruningHook():
                 continue
             ista_cnt += 1
             with torch.no_grad():
-                # weight
-                module.weight.data = exp_quantization_mult(module.weight)
-                # grad
-                #module.weight.grad = exp_quantization(module.weight.grad)
+                module.weight.data = adapt_ista(module.weight,module.cost)
         for group in self.groups:
             mask_len = len(self.groups[group][0].in_mask.view(-1))
             for module in self.groups[group]:
                 ista_cnt += 1
                 with torch.no_grad():
-                    module.weight.data = exp_quantization_mult(module.weight)
-                    #module.weight.grad = exp_quantization(module.weight.grad)
+                    module.weight.data = adapt_ista(module.weight,module.cost)
                     
         self.ista_err /= ista_cnt
         for i in range(num_bins):
