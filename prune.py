@@ -420,10 +420,12 @@ class FisherPruningHook():
                 delta_acts = 0
                 for ancestor in ancestors:
                     delta_acts += self.acts[ancestor] / ancestor.out_channels
-                fisher /= (float(max(delta_acts, 1.)) / 1e6)
-                grad = mag
-                mag /= (float(max(delta_acts, 1.)) / 1e6)
+                #fisher /= (float(max(delta_acts, 1.)) / 1e6)
+                #mag /= (float(max(delta_acts, 1.)) / 1e6)
                 #grad /= (float(max(delta_acts, 1.)) / 1e6)
+                # test
+                fisher = 1./float(self.acts[group] / 1e6)
+                grad = mag/float(self.acts[group] / 1e6)
             self.fisher_list = torch.cat((self.fisher_list,fisher[in_mask.bool()].view(-1)))
             self.mag_list = torch.cat((self.mag_list,mag[in_mask.bool()].view(-1)))
             self.grad_list = torch.cat((self.grad_list,grad[in_mask.bool()].view(-1)))
@@ -455,10 +457,12 @@ class FisherPruningHook():
                 mag /= float(self.flops[group] / 1e9)
                 grad /= float(self.flops[group] / 1e9)
             elif self.delta == 'acts':
-                fisher /= float(self.acts[group] / 1e6)
-                grad = mag
-                mag /= float(self.acts[group] / 1e6)
+                #fisher /= float(self.acts[group] / 1e6)
+                #mag /= float(self.acts[group] / 1e6)
                 #grad /= float(self.acts[group] / 1e6)
+                # test
+                fisher = 1./float(self.acts[group] / 1e6)
+                grad = mag/float(self.acts[group] / 1e6)
             self.fisher_list = torch.cat((self.fisher_list,fisher[in_mask.bool()].view(-1)))
             self.mag_list = torch.cat((self.mag_list,mag[in_mask.bool()].view(-1)))
             self.grad_list = torch.cat((self.grad_list,grad[in_mask.bool()].view(-1)))
@@ -480,8 +484,10 @@ class FisherPruningHook():
                 module.in_mask[channel] = 0
                 
     def ista(self):
+        return
         self.ista_err = torch.tensor([0.0]).cuda(0)
-        self.ista_err_bins = [0 for _ in range(8)]
+        num_bins = 10
+        self.ista_err_bins = [0 for _ in range(num_bins)]
         ista_cnt = torch.tensor([0.0]).cuda(0)
         
         def exp_quantization_add(x):
@@ -498,7 +504,7 @@ class FisherPruningHook():
         def exp_quantization_mult(x):
             x = torch.clamp(torch.abs(x), min=1e-8) * torch.sign(x)
             #bins = torch.FloatTensor([1e-8,1e-6,1e-4,1e-2,1,1e2,1e4,1e6]).to(x.device)
-            bins = torch.pow(10,torch.tensor([-3,-2.5,-2,-1.5,-1,-0.5,0,0.5])).to(x.device)
+            bins = torch.pow(10,torch.tensor([-3,-2.5,-2,-1.5,-1,-0.5,0,0.5,1,1.5])).to(x.device)
             decay_factor = 1e-3
             dist = torch.abs(torch.log(torch.abs(x).unsqueeze(-1)/bins))
             _,min_idx = dist.min(dim=-1)
@@ -509,7 +515,7 @@ class FisherPruningHook():
             all_err = torch.abs(torch.log(bins[min_idx]/torch.abs(x)))
             self.ista_err += all_err.mean()
             # calculating err for each bin
-            for i in range(8):
+            for i in range(num_bins):
                 if torch.sum(min_idx==i)>0:
                     self.ista_err_bins[i] += all_err[min_idx==i].mean().cpu().item()
             return x
@@ -532,7 +538,7 @@ class FisherPruningHook():
                     #module.weight.grad = exp_quantization(module.weight.grad)
                     
         self.ista_err /= ista_cnt
-        for i in range(8):
+        for i in range(num_bins):
             self.ista_err_bins[i] /= int(ista_cnt)
     
     def add_noise_mask(self):
