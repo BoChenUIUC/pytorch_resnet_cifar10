@@ -514,7 +514,6 @@ class FisherPruningHook():
             # larger index should get larger mean for larger distance
             # already large distance needs little influence on distribution
             decay_factor = 1e-4
-            dist = torch.abs(torch.log(torch.abs(x).unsqueeze(-1)/bins))
             x = torch.sign(x) * torch.clamp((torch.abs(x) - decay_factor), min=0.) 
             return x
             
