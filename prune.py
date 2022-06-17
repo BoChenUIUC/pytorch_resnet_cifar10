@@ -510,7 +510,10 @@ class FisherPruningHook():
             self.ista_err += all_err.mean()
             # calculating err for each bin
             for i in range(8):
-                self.ista_err_bins[i] += all_err[min_idx==i].mean().cpu().item()
+                err = all_err[min_idx==i].mean().cpu().item()
+                self.ista_err_bins[i] += err
+                print(err,i)
+            exit(0)
             return x
             
         for module, name in self.conv_names.items():
