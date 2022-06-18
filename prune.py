@@ -494,7 +494,7 @@ class FisherPruningHook():
                 
     def ista(self):
         self.ista_err = torch.tensor([0.0]).cuda(0)
-        num_bins = 9
+        num_bins = 7
         self.ista_err_bins = [0 for _ in range(num_bins)]
         ista_cnt = torch.tensor([0.0]).cuda(0)
         
@@ -520,7 +520,7 @@ class FisherPruningHook():
         def adapt_ista2(x):
             x = torch.clamp(torch.abs(x), min=1e-8) * torch.sign(x)
             #bins = torch.FloatTensor([1e-8,1e-6,1e-4,1e-2,1,1e2,1e4,1e6]).to(x.device)
-            bins = torch.pow(10,torch.tensor([-4,-3,-2,-1,0,1,2,3,4])).to(x.device)
+            bins = torch.pow(10,torch.tensor([-2,-1,0,1,2])).to(x.device)
             decay_factor = 1e-3
             dist = torch.abs(torch.log(torch.abs(x).unsqueeze(-1)/bins))
             _,min_idx = dist.min(dim=-1)
