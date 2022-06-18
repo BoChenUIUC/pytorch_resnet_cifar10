@@ -525,6 +525,7 @@ class FisherPruningHook():
             dist = torch.abs(torch.log(torch.abs(x).unsqueeze(-1)/bins))
             _,min_idx = dist.min(dim=-1)
             print(x)
+            print(dist)
             print(min_idx)
             exit(0)
             offset = bins[min_idx] - torch.abs(x)
