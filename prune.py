@@ -524,10 +524,6 @@ class FisherPruningHook():
             decay_factor = 1e-3
             dist = torch.abs(torch.log10(torch.abs(x).unsqueeze(-1)/bins))
             _,min_idx = dist.min(dim=-1)
-            print(x)
-            print(dist)
-            print(min_idx)
-            exit(0)
             offset = bins[min_idx] - torch.abs(x)
             x = torch.sign(x) * (torch.abs(x) + decay_factor * offset)
             all_err = torch.abs(torch.log10(bins[min_idx]/torch.abs(x)))
