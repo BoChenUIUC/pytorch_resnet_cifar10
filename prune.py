@@ -535,6 +535,7 @@ class FisherPruningHook():
             print(x)
             print(min_idx)
             print(self.ista_err_bins)
+            exit(0)
             return x
             
         for module, name in self.conv_names.items():
