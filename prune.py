@@ -389,9 +389,9 @@ class FisherPruningHook():
         for module, name in self.conv_names.items():
             if exclude is not None and module in exclude:
                 continue
-            fisher = self.accum_fishers[module]
-            mag = self.accum_mags[module]
-            grad = self.accum_grads[module]
+            fisher = self.accum_fishers[module]/self.interval
+            mag = self.accum_mags[module]/self.interval
+            grad = self.accum_grads[module]/self.interval
             in_mask = module.in_mask.view(-1)
             ancestors = self.conv2ancest[module]
             if self.delta == 'flops':
