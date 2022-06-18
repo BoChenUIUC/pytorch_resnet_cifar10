@@ -532,6 +532,7 @@ class FisherPruningHook():
             for i in range(num_bins):
                 if torch.sum(min_idx==i)>0:
                     self.ista_err_bins[i] += all_err[min_idx==i].sum().cpu().item()
+            return x
             
         for module, name in self.conv_names.items():
             if self.group_modules is not None and module in self.group_modules:
