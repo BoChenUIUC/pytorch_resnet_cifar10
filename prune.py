@@ -451,9 +451,9 @@ class FisherPruningHook():
         for group in self.groups:
             # they share the same in mask
             in_mask = self.groups[group][0].in_mask.view(-1)
-            fisher = self.accum_fishers[group].double()
-            mag = self.accum_mags[group].double()
-            grad = self.accum_grads[group].double()
+            fisher = self.accum_fishers[group].double()/self.interval
+            mag = self.accum_mags[group].double()/self.interval
+            grad = self.accum_grads[group].double()/self.interval
             if self.delta == 'flops':
                 fisher /= float(self.flops[group] / 1e9)
                 mag /= float(self.flops[group] / 1e9)
@@ -532,10 +532,6 @@ class FisherPruningHook():
             for i in range(num_bins):
                 if torch.sum(min_idx==i)>0:
                     self.ista_err_bins[i] += all_err[min_idx==i].sum().cpu().item()
-            print(x)
-            print(min_idx)
-            print(self.ista_err_bins)
-            exit(0)
             return x
             
         for module, name in self.conv_names.items():
