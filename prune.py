@@ -222,7 +222,7 @@ class FisherPruningHook():
         if self.penalty is not None:
             save_dir = f'metrics/L{int(-math.log10(max(1e-8,abs(self.penalty[0]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[1]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[2]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[3]))))}/'
         else:
-            save_dir = f'metrics/qista2/'
+            save_dir = f'metrics/base/'
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         fig, axs = plt.subplots(ncols=4, figsize=(24,4))
@@ -434,6 +434,7 @@ class FisherPruningHook():
             self.fisher_info_list = torch.cat((self.fisher_info_list,fisher[in_mask.bool()].view(-1)))
             self.mag_info_list = torch.cat((self.mag_info_list,mag[in_mask.bool()].view(-1)))
             self.grad_info_list = torch.cat((self.grad_info_list,grad[in_mask.bool()].view(-1)))
+            self.weight_mag = torch.cat((self.weight_mag,module.weight.data.view(-1)))
             info.update(
                 self.find_pruning_channel(module, fisher, in_mask, info))
                 
@@ -449,6 +450,7 @@ class FisherPruningHook():
         self.fisher_info_list = torch.tensor([]).cuda()
         self.mag_info_list = torch.tensor([]).cuda()
         self.grad_info_list = torch.tensor([]).cuda()
+        self.weight_mag = torch.tensor([]).cuda()
         self.cost_values = set()
         info.update(self.single_prune(info, self.group_modules))
         for group in self.groups:
@@ -475,6 +477,8 @@ class FisherPruningHook():
             self.fisher_info_list = torch.cat((self.fisher_info_list,fisher[in_mask.bool()].view(-1)))
             self.mag_info_list = torch.cat((self.mag_info_list,mag[in_mask.bool()].view(-1)))
             self.grad_info_list = torch.cat((self.grad_info_list,grad[in_mask.bool()].view(-1)))
+            for module in self.groups[group]:
+                self.weight_mag = torch.cat((self.weight_mag,module.weight.data.view(-1)))
             info.update(self.find_pruning_channel(group, fisher, in_mask, info))
             
         # sort cost values
@@ -496,10 +500,10 @@ class FisherPruningHook():
                 module.in_mask[channel] = 0
                 
     def ista(self):
+        return
         self.ista_err = torch.tensor([0.0]).cuda(0)
         num_bins = 5
         self.ista_err_bins = [0 for _ in range(num_bins)]
-        self.weight_mag = torch.tensor([]).cuda()
         
         def exp_quantization_add(x):
             bins = torch.FloatTensor([1e-8,1e-6,1e-4,1e-2,1,1e2,1e4,1e6]).to(x.device)
@@ -541,14 +545,13 @@ class FisherPruningHook():
             if self.group_modules is not None and module in self.group_modules:
                 continue
             with torch.no_grad():
-                module.weight.data = adapt_ista2(module.weight)    
-            self.weight_mag = torch.cat((self.weight_mag,module.weight.data.view(-1)))
+                module.weight.data = adapt_ista2(module.weight)  
+                
         for group in self.groups:
             mask_len = len(self.groups[group][0].in_mask.view(-1))
             for module in self.groups[group]:
                 with torch.no_grad():
                     module.weight.data = adapt_ista2(module.weight)
-                self.weight_mag = torch.cat((self.weight_mag,module.weight.data.view(-1)))
                 
     def add_noise_mask(self):
         sorted, indices = self.fisher_info_list.sort(dim=0)
