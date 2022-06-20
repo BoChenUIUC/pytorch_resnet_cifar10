@@ -521,9 +521,9 @@ class FisherPruningHook():
             dist = torch.abs(torch.log10(torch.abs(x).unsqueeze(-1)/bins))
             _,min_idx = dist.min(dim=-1)
             all_err = torch.log10(bins[min_idx]/torch.abs(x))
-            abs_error = torch.abs(all_err)
+            abs_err = torch.abs(all_err)
             # calculate total error
-            self.ista_err += abs_error.sum()
+            self.ista_err += abs_err.sum()
             # calculating err for each bin
             for i in range(num_bins):
                 if torch.sum(min_idx==i)>0:
@@ -532,7 +532,7 @@ class FisherPruningHook():
             sn = torch.sign(torch.log(bins[min_idx]/torch.abs(x)))
             multiplier = 10**(sn*bin_stride*decay_factor) 
             #multiplier = 10**(torch.log10(bins[min_idx]/torch.abs(x))*decay_factor)
-            x[abs_error>bin_width] *= multiplier[abs_error>bin_width]
+            x[abs_err>bin_width] *= multiplier[abs_err>bin_width]
             return x
             
         for module, name in self.conv_names.items():
