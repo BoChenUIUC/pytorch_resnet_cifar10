@@ -222,7 +222,7 @@ class FisherPruningHook():
         if self.penalty is not None:
             save_dir = f'metrics/L{int(-math.log10(max(1e-8,abs(self.penalty[0]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[1]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[2]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[3]))))}/'
         else:
-            save_dir = f'metrics/base/'
+            save_dir = f'metrics/mista2/'
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         fig, axs = plt.subplots(ncols=5, figsize=(24,4))
