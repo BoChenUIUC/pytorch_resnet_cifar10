@@ -225,7 +225,7 @@ class FisherPruningHook():
             save_dir = f'metrics/base/'
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
-        fig, axs = plt.subplots(ncols=5, figsize=(26,4))
+        fig, axs = plt.subplots(ncols=5, figsize=(24,4))
         # fisher
         self.fisher_info_list[self.fisher_info_list==0] = 1e-50
         self.fisher_info_list = torch.log10(self.fisher_info_list).detach().cpu().numpy()
@@ -533,7 +533,7 @@ class FisherPruningHook():
             x = torch.clamp(torch.abs(x), min=1e-8) * torch.sign(x)
             #bins = torch.FloatTensor([1e-8,1e-6,1e-4,1e-2,1,1e2,1e4,1e6]).to(x.device)
             bins = torch.pow(10.,torch.tensor([-8+2*x for x in range(num_bins)])).to(x.device)
-            decay_factor = 0
+            decay_factor = 1e-2
             dist = torch.abs(torch.log10(torch.abs(x).unsqueeze(-1)/bins))
             _,min_idx = dist.min(dim=-1)
             offset = bins[min_idx] - torch.abs(x)
