@@ -542,13 +542,13 @@ class FisherPruningHook():
                 continue
             with torch.no_grad():
                 module.weight.data = adapt_ista2(module.weight)    
-            self.weight_mag = torch.cat(self.weight_mag,module.weight.data.view(-1))
+            self.weight_mag = torch.cat((self.weight_mag,module.weight.data.view(-1)))
         for group in self.groups:
             mask_len = len(self.groups[group][0].in_mask.view(-1))
             for module in self.groups[group]:
                 with torch.no_grad():
                     module.weight.data = adapt_ista2(module.weight)
-                self.weight_mag = torch.cat(self.weight_mag,module.weight.data.view(-1))
+                self.weight_mag = torch.cat((self.weight_mag,module.weight.data.view(-1)))
                 
     def add_noise_mask(self):
         sorted, indices = self.fisher_info_list.sort(dim=0)
