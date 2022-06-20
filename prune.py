@@ -233,7 +233,7 @@ class FisherPruningHook():
         self.grad_info_list[self.grad_info_list==0] = 1e-50
         self.grad_info_list = torch.log10(self.grad_info_list).detach().cpu().numpy()
         sns.histplot(self.grad_info_list, ax=axs[1])
-        self.rev_cost_list[self.fisher_info_list==0] = 1e-50
+        self.rev_cost_list[self.rev_cost_list==0] = 1e-50
         self.rev_cost_list = torch.log10(self.rev_cost_list).detach().cpu().numpy()
         sns.histplot(self.rev_cost_list, ax=axs[2])
         self.mag_info_list[self.mag_info_list==0] = 1e-50
@@ -508,6 +508,7 @@ class FisherPruningHook():
     def ista(self):
         self.ista_err = torch.tensor([0.0]).cuda(0)
         num_bins = 6
+        bin_width = 2
         self.ista_err_bins = [0 for _ in range(num_bins)]
         
         def exp_quantization_add(x):
@@ -532,12 +533,13 @@ class FisherPruningHook():
         def adapt_ista2(x):
             x = torch.clamp(torch.abs(x), min=1e-8) * torch.sign(x)
             #bins = torch.FloatTensor([1e-8,1e-6,1e-4,1e-2,1,1e2,1e4,1e6]).to(x.device)
-            bins = torch.pow(10.,torch.tensor([-8+2*x for x in range(num_bins)])).to(x.device)
+            bins = torch.pow(10.,torch.tensor([-8+bin_width*x for x in range(num_bins)])).to(x.device)
             decay_factor = 1e-2
             dist = torch.abs(torch.log10(torch.abs(x).unsqueeze(-1)/bins))
             _,min_idx = dist.min(dim=-1)
-            offset = bins[min_idx] - torch.abs(x)
-            x = torch.sign(x) * (torch.abs(x) + decay_factor * bins[min_idx] * torch.sign(offset))
+            sn = torch.sign(torch.log10(bins[min_idx]/torch.abs(x)))
+            multiplier = 10**(sn*bin_width*decay_factor) 
+            x *= multiplier
             all_err = torch.abs(torch.log10(bins[min_idx]/torch.abs(x)))
             self.ista_err += all_err.sum()
             # calculating err for each bin
