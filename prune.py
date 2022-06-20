@@ -437,7 +437,7 @@ class FisherPruningHook():
             self.fisher_info_list = torch.cat((self.fisher_info_list,fisher[in_mask.bool()].view(-1)))
             self.mag_info_list = torch.cat((self.mag_info_list,mag[in_mask.bool()].view(-1)))
             self.grad_info_list = torch.cat((self.grad_info_list,grad[in_mask.bool()].view(-1)))
-            self.rev_cost_list = torch.cat((self.rev_cost_list,rev_cost.rep(len(in_mask))))
+            self.rev_cost_list = torch.cat((self.rev_cost_list,rev_cost.repeat(len(in_mask))))
             self.weight_mag = torch.cat((self.weight_mag,module.weight.data.view(-1)))
             info.update(
                 self.find_pruning_channel(module, fisher, in_mask, info))
@@ -482,7 +482,7 @@ class FisherPruningHook():
             self.fisher_info_list = torch.cat((self.fisher_info_list,fisher[in_mask.bool()].view(-1)))
             self.mag_info_list = torch.cat((self.mag_info_list,mag[in_mask.bool()].view(-1)))
             self.grad_info_list = torch.cat((self.grad_info_list,grad[in_mask.bool()].view(-1)))
-            self.rev_cost_list = torch.cat((self.rev_cost_list,rev_cost.rep(len(in_mask))))
+            self.rev_cost_list = torch.cat((self.rev_cost_list,rev_cost.repeat(len(in_mask))))
             for module in self.groups[group]:
                 self.weight_mag = torch.cat((self.weight_mag,module.weight.data.view(-1)))
             info.update(self.find_pruning_channel(group, fisher, in_mask, info))
