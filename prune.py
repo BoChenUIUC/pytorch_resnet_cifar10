@@ -225,17 +225,20 @@ class FisherPruningHook():
             save_dir = f'metrics/qista2/'
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
-        fig, axs = plt.subplots(ncols=3, figsize=(30, 8))
+        fig, axs = plt.subplots(ncols=4, figsize=(24,4))
         # fisher
-        self.fisher_list[self.fisher_list==0] = 1e-50
-        self.fisher_list = torch.log10(self.fisher_list).detach().cpu().numpy()
-        sns.histplot(self.fisher_list, ax=axs[0])
-        self.grad_list[self.grad_list==0] = 1e-50
-        self.grad_list = torch.log10(self.grad_list).detach().cpu().numpy()
-        sns.histplot(self.grad_list, ax=axs[1])
-        self.mag_list[self.mag_list==0] = 1e-50
-        self.mag_list = torch.log10(self.mag_list).detach().cpu().numpy()
-        sns.histplot(self.mag_list, ax=axs[2])
+        self.fisher_info_list[self.fisher_info_list==0] = 1e-50
+        self.fisher_info_list = torch.log10(self.fisher_info_list).detach().cpu().numpy()
+        sns.histplot(self.fisher_info_list, ax=axs[0])
+        self.grad_info_list[self.grad_info_list==0] = 1e-50
+        self.grad_info_list = torch.log10(self.grad_info_list).detach().cpu().numpy()
+        sns.histplot(self.grad_info_list, ax=axs[1])
+        self.mag_info_list[self.mag_info_list==0] = 1e-50
+        self.mag_info_list = torch.log10(self.mag_info_list).detach().cpu().numpy()
+        sns.histplot(self.mag_info_list, ax=axs[2])
+        self.weight_mag[self.weight_mag==0] = 1e-50
+        self.weight_mag = torch.log10(self.weight_mag).detach().cpu().numpy()
+        sns.histplot(self.weight_mag, ax=axs[3])
         fig.savefig(save_dir + f'{self.iter:03d}_{print_str}.png')
         plt.close('all')
         self.iter += 1
@@ -428,9 +431,9 @@ class FisherPruningHook():
                 self.cost_values.add(1./(float(max(delta_acts, 1.)) / 1e6))
                 grad = mag/(float(max(delta_acts, 1.)) / 1e6)
                 module.cost = 1./(float(max(delta_acts, 1.)) / 1e6)
-            self.fisher_list = torch.cat((self.fisher_list,fisher[in_mask.bool()].view(-1)))
-            self.mag_list = torch.cat((self.mag_list,mag[in_mask.bool()].view(-1)))
-            self.grad_list = torch.cat((self.grad_list,grad[in_mask.bool()].view(-1)))
+            self.fisher_info_list = torch.cat((self.fisher_info_list,fisher[in_mask.bool()].view(-1)))
+            self.mag_info_list = torch.cat((self.mag_info_list,mag[in_mask.bool()].view(-1)))
+            self.grad_info_list = torch.cat((self.grad_info_list,grad[in_mask.bool()].view(-1)))
             info.update(
                 self.find_pruning_channel(module, fisher, in_mask, info))
                 
@@ -443,9 +446,9 @@ class FisherPruningHook():
         # order channels so that noise can be added accordingly
 
         info = {'module': None, 'channel': None, 'min': 1e15}
-        self.fisher_list = torch.tensor([]).cuda()
-        self.mag_list = torch.tensor([]).cuda()
-        self.grad_list = torch.tensor([]).cuda()
+        self.fisher_info_list = torch.tensor([]).cuda()
+        self.mag_info_list = torch.tensor([]).cuda()
+        self.grad_info_list = torch.tensor([]).cuda()
         self.cost_values = set()
         info.update(self.single_prune(info, self.group_modules))
         for group in self.groups:
@@ -469,9 +472,9 @@ class FisherPruningHook():
                 for module in self.groups[group]:
                     module.cost = 1./float(self.acts[group] / 1e6)
                 # test
-            self.fisher_list = torch.cat((self.fisher_list,fisher[in_mask.bool()].view(-1)))
-            self.mag_list = torch.cat((self.mag_list,mag[in_mask.bool()].view(-1)))
-            self.grad_list = torch.cat((self.grad_list,grad[in_mask.bool()].view(-1)))
+            self.fisher_info_list = torch.cat((self.fisher_info_list,fisher[in_mask.bool()].view(-1)))
+            self.mag_info_list = torch.cat((self.mag_info_list,mag[in_mask.bool()].view(-1)))
+            self.grad_info_list = torch.cat((self.grad_info_list,grad[in_mask.bool()].view(-1)))
             info.update(self.find_pruning_channel(group, fisher, in_mask, info))
             
         # sort cost values
@@ -496,7 +499,7 @@ class FisherPruningHook():
         self.ista_err = torch.tensor([0.0]).cuda(0)
         num_bins = 5
         self.ista_err_bins = [0 for _ in range(num_bins)]
-        ista_cnt = torch.tensor([0.0]).cuda(0)
+        self.weight_mag = torch.tensor([]).cuda()
         
         def exp_quantization_add(x):
             bins = torch.FloatTensor([1e-8,1e-6,1e-4,1e-2,1,1e2,1e4,1e6]).to(x.device)
@@ -521,7 +524,7 @@ class FisherPruningHook():
             x = torch.clamp(torch.abs(x), min=1e-8) * torch.sign(x)
             #bins = torch.FloatTensor([1e-8,1e-6,1e-4,1e-2,1,1e2,1e4,1e6]).to(x.device)
             bins = torch.pow(10.,torch.tensor([-8+2*x for x in range(num_bins)])).to(x.device)
-            decay_factor = 1e-3
+            decay_factor = 1e-2
             dist = torch.abs(torch.log10(torch.abs(x).unsqueeze(-1)/bins))
             _,min_idx = dist.min(dim=-1)
             offset = bins[min_idx] - torch.abs(x)
@@ -537,23 +540,23 @@ class FisherPruningHook():
         for module, name in self.conv_names.items():
             if self.group_modules is not None and module in self.group_modules:
                 continue
-            ista_cnt += 1
             with torch.no_grad():
-                module.weight.data = adapt_ista2(module.weight)
+                module.weight.data = adapt_ista2(module.weight)    
+            self.weight_mag = torch.cat(self.weight_mag,module.weight.data.view(-1))
         for group in self.groups:
             mask_len = len(self.groups[group][0].in_mask.view(-1))
             for module in self.groups[group]:
-                ista_cnt += 1
                 with torch.no_grad():
                     module.weight.data = adapt_ista2(module.weight)
-    
+                self.weight_mag = torch.cat(self.weight_mag,module.weight.data.view(-1))
+                
     def add_noise_mask(self):
-        sorted, indices = self.fisher_list.sort(dim=0)
+        sorted, indices = self.fisher_info_list.sort(dim=0)
         
         num_groups,mult,noise_decay = 4,1,1e-1
-        split_size = len(self.fisher_list)//num_groups + 1
+        split_size = len(self.fisher_info_list)//num_groups + 1
         ind_groups = torch.split(indices, split_size)
-        noise_scale = torch.ones_like(self.fisher_list).float()
+        noise_scale = torch.ones_like(self.fisher_info_list).float()
         for ind_group in ind_groups:
             noise_scale[ind_group] = mult
             mult *= noise_decay
