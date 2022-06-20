@@ -537,7 +537,7 @@ class FisherPruningHook():
             dist = torch.abs(torch.log10(torch.abs(x).unsqueeze(-1)/bins))
             _,min_idx = dist.min(dim=-1)
             offset = bins[min_idx] - torch.abs(x)
-            x = torch.sign(x) * (torch.abs(x) + decay_factor * offset)
+            x = torch.sign(x) * (torch.abs(x) + decay_factor * bins[min_idx])
             all_err = torch.abs(torch.log10(bins[min_idx]/torch.abs(x)))
             self.ista_err += all_err.sum()
             # calculating err for each bin
