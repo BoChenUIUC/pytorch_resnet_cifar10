@@ -222,7 +222,7 @@ class FisherPruningHook():
         if self.penalty is not None:
             save_dir = f'metrics/L{int(-math.log10(max(1e-8,abs(self.penalty[0]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[1]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[2]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[3]))))}/'
         else:
-            save_dir = f'metrics/mista2/'
+            save_dir = f'metrics/lq3/'
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         fig, axs = plt.subplots(ncols=5, figsize=(24,4))
@@ -511,33 +511,14 @@ class FisherPruningHook():
         bin_width = 2
         self.ista_err_bins = [0 for _ in range(num_bins)]
         
-        def exp_quantization_add(x):
-            bins = torch.FloatTensor([1e-8,1e-6,1e-4,1e-2,1,1e2,1e4,1e6]).to(x.device)
-            decay_factor = 1e-3
-            dist = torch.abs(torch.abs(x).unsqueeze(-1) - bins)
-            _,min_idx = dist.min(dim=-1)
-            offset = bins[min_idx] - torch.abs(x)
-            x = torch.sign(x) * (torch.abs(x) + decay_factor * offset)
-            all_err = torch.abs(torch.log(bins[min_idx]/torch.abs(x)))
-            self.ista_err += all_err.sum()
-            return x
-            
-        def adapt_ista(x):
-            #ista_idx = self.cost_values.index(cost)
-            # larger index should get larger mean for larger distance
-            # already large distance needs little influence on distribution
-            decay_factor = 1e-4
-            x = torch.sign(x) * torch.clamp((torch.abs(x) - decay_factor), min=0.) 
-            return x
-            
-        def adapt_ista2(x):
+        def exp_quantization(x):
             x = torch.clamp(torch.abs(x), min=1e-8) * torch.sign(x)
             #bins = torch.FloatTensor([1e-8,1e-6,1e-4,1e-2,1,1e2,1e4,1e6]).to(x.device)
             bins = torch.pow(10.,torch.tensor([-8+bin_width*x for x in range(num_bins)])).to(x.device)
-            decay_factor = 1e-2
+            decay_factor = 1e-3
             dist = torch.abs(torch.log10(torch.abs(x).unsqueeze(-1)/bins))
             _,min_idx = dist.min(dim=-1)
-            sn = torch.sign(torch.log10(bins[min_idx]/torch.abs(x)))
+            sn = torch.sign(torch.log(bins[min_idx]/torch.abs(x)))
             multiplier = 10**(sn*bin_width*decay_factor) 
             x *= multiplier
             all_err = torch.abs(torch.log10(bins[min_idx]/torch.abs(x)))
@@ -552,13 +533,13 @@ class FisherPruningHook():
             if self.group_modules is not None and module in self.group_modules:
                 continue
             with torch.no_grad():
-                module.weight.data = adapt_ista2(module.weight)  
+                module.weight.data = exp_quantization(module.weight)  
                 
         for group in self.groups:
             mask_len = len(self.groups[group][0].in_mask.view(-1))
             for module in self.groups[group]:
                 with torch.no_grad():
-                    module.weight.data = adapt_ista2(module.weight)
+                    module.weight.data = exp_quantization(module.weight)
                 
     def add_noise_mask(self):
         sorted, indices = self.fisher_info_list.sort(dim=0)
