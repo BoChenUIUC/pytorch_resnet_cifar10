@@ -222,7 +222,7 @@ class FisherPruningHook():
         if self.penalty is not None:
             save_dir = f'metrics/L{int(-math.log10(max(1e-8,abs(self.penalty[0]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[1]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[2]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[3]))))}/'
         else:
-            save_dir = f'metrics/lq3/'
+            save_dir = f'metrics/lq2/'
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         fig, axs = plt.subplots(ncols=5, figsize=(24,4))
@@ -507,29 +507,32 @@ class FisherPruningHook():
                 
     def ista(self):
         self.ista_err = torch.tensor([0.0]).cuda(0)
-        num_bins = 6
-        bin_stride = 2
-        bin_width = 2e-1
+        num_bins = 9
+        bin_start = -8
+        bin_stride = 1
+        bin_width = 1e-1
         self.ista_err_bins = [0 for _ in range(num_bins)]
         
         def exp_quantization(x):
             x = torch.clamp(torch.abs(x), min=1e-8) * torch.sign(x)
             #bins = torch.FloatTensor([1e-8,1e-6,1e-4,1e-2,1,1e2,1e4,1e6]).to(x.device)
-            bins = torch.pow(10.,torch.tensor([-8+bin_stride*x for x in range(num_bins)])).to(x.device)
+            bins = torch.pow(10.,torch.tensor([bin_start+bin_stride*x for x in range(num_bins)])).to(x.device)
             decay_factor = 1e-2
             dist = torch.abs(torch.log10(torch.abs(x).unsqueeze(-1)/bins))
             _,min_idx = dist.min(dim=-1)
-            log_err = torch.abs(torch.log10(bins[min_idx]/torch.abs(x)))
-            #sn = torch.sign(torch.log(bins[min_idx]/torch.abs(x)))
-            #multiplier = 10**(sn*bin_stride*decay_factor) 
-            multiplier = 10**(torch.log10(bins[min_idx]/torch.abs(x))*decay_factor)
-            x[log_err>bin_width] *= multiplier[log_err>bin_width]
-            all_err = torch.abs(torch.log10(bins[min_idx]/torch.abs(x)))
-            self.ista_err += all_err.sum()
+            all_err = torch.log10(bins[min_idx]/torch.abs(x))
+            abs_error = torch.abs(all_err)
+            # calculate total error
+            self.ista_err += abs_error.sum()
             # calculating err for each bin
             for i in range(num_bins):
                 if torch.sum(min_idx==i)>0:
-                    self.ista_err_bins[i] += all_err[min_idx==i].sum().cpu().item()
+                    self.ista_err_bins[i] += abs_err[min_idx==i].sum().cpu().item()
+            # modification of weights
+            sn = torch.sign(torch.log(bins[min_idx]/torch.abs(x)))
+            multiplier = 10**(sn*bin_stride*decay_factor) 
+            #multiplier = 10**(torch.log10(bins[min_idx]/torch.abs(x))*decay_factor)
+            x[abs_error>bin_width] *= multiplier[abs_error>bin_width]
             return x
             
         for module, name in self.conv_names.items():
