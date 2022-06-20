@@ -229,19 +229,19 @@ class FisherPruningHook():
         # fisher
         self.fisher_info_list[self.fisher_info_list==0] = 1e-50
         self.fisher_info_list = torch.log10(self.fisher_info_list).detach().cpu().numpy()
-        sns.histplot(self.fisher_info_list, ax=axs[0], x='fisher-based info')
+        sns.histplot(self.fisher_info_list, ax=axs[0], x="fisher-based info")
         self.grad_info_list[self.grad_info_list==0] = 1e-50
         self.grad_info_list = torch.log10(self.grad_info_list).detach().cpu().numpy()
-        sns.histplot(self.grad_info_list, ax=axs[1], x='magnitude-based info')
+        sns.histplot(self.grad_info_list, ax=axs[1], x="magnitude-based info")
         self.rev_cost_list[self.fisher_info_list==0] = 1e-50
         self.rev_cost_list = torch.log10(self.rev_cost_list).detach().cpu().numpy()
-        sns.histplot(self.rev_cost_list, ax=axs[2], x='reverse cost')
+        sns.histplot(self.rev_cost_list, ax=axs[2], x="reverse cost")
         self.mag_info_list[self.mag_info_list==0] = 1e-50
         self.mag_info_list = torch.log10(self.mag_info_list).detach().cpu().numpy()
-        sns.histplot(self.mag_info_list, ax=axs[3], x='magnitude value')
+        sns.histplot(self.mag_info_list, ax=axs[3], x="magnitude value")
         self.weight_mag[self.weight_mag==0] = 1e-50
         self.weight_mag = torch.log10(self.weight_mag).detach().cpu().numpy()
-        sns.histplot(self.weight_mag, ax=axs[4], x='weight magnitude')
+        sns.histplot(self.weight_mag, ax=axs[4], x="weight magnitude")
         fig.savefig(save_dir + f'{self.iter:03d}_{print_str}.png')
         plt.close('all')
         self.iter += 1
