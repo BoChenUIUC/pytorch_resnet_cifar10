@@ -430,7 +430,7 @@ class FisherPruningHook():
                 #mag /= (float(max(delta_acts, 1.)) / 1e6)
                 #grad /= (float(max(delta_acts, 1.)) / 1e6)
                 # test
-                rev_cost = torch.tensor([1./float(self.acts[group] / 1e6)])
+                rev_cost = torch.tensor([1./(float(max(delta_acts, 1.)) / 1e6)])
                 self.cost_values.add(1./(float(max(delta_acts, 1.)) / 1e6))
                 grad = mag/(float(max(delta_acts, 1.)) / 1e6)
                 module.cost = 1./(float(max(delta_acts, 1.)) / 1e6)
