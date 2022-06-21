@@ -222,7 +222,7 @@ class FisherPruningHook():
         if self.penalty is not None:
             save_dir = f'metrics/L{int(-math.log10(max(1e-8,abs(self.penalty[0]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[1]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[2]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[3]))))}/'
         else:
-            save_dir = f'metrics/lq2_s2/'
+            save_dir = f'metrics/lq4/'
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         fig, axs = plt.subplots(ncols=5, figsize=(24,4))
@@ -507,11 +507,11 @@ class FisherPruningHook():
                 
     def ista(self):
         self.ista_err = torch.tensor([0.0]).cuda(0)
-        num_bins = 5
+        num_bins = 9
         bin_start = -8
-        bin_stride = 2
+        bin_stride = 1
         bin_width = 1e-1
-        decay_factor = 1e-3
+        decay_factor = 1e-4
         self.ista_err_bins = [0 for _ in range(num_bins)]
         self.ista_cnt_bins = [0 for _ in range(num_bins)]
         
