@@ -225,7 +225,7 @@ class FisherPruningHook():
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         fig, axs = plt.subplots(ncols=5, figsize=(24,4))
-        # fisher
+        # plots
         self.fisher_info_list[self.fisher_info_list==0] = 1e-50
         self.fisher_info_list = torch.log10(self.fisher_info_list).detach().cpu().numpy()
         sns.histplot(self.fisher_info_list, ax=axs[0])
@@ -513,6 +513,7 @@ class FisherPruningHook():
         decay_factor = 1e-3
         self.ista_err_bins = [0 for _ in range(num_bins)]
         self.ista_cnt_bins = [0 for _ in range(num_bins)]
+        return
         
         def exp_quantization(x):
             x = torch.clamp(torch.abs(x), min=1e-8) * torch.sign(x)
@@ -546,63 +547,6 @@ class FisherPruningHook():
             for module in self.groups[group]:
                 with torch.no_grad():
                     module.weight.data = exp_quantization(module.weight)
-                
-    def add_noise_mask(self):
-        sorted, indices = self.fisher_info_list.sort(dim=0)
-        
-        num_groups,mult,noise_decay = 4,1,1e-1
-        split_size = len(self.fisher_info_list)//num_groups + 1
-        ind_groups = torch.split(indices, split_size)
-        noise_scale = torch.ones_like(self.fisher_info_list).float()
-        for ind_group in ind_groups:
-            noise_scale[ind_group] = mult
-            mult *= noise_decay
-            
-        mask_start = 0
-        for module, name in self.conv_names.items():
-            if self.group_modules is not None and module in self.group_modules:
-                continue
-            mask_len = len(module.in_mask.view(-1))
-            module.in_mask = noise_scale[mask_start:mask_start+mask_len]
-            mask_start += mask_len
-                
-        for group in self.groups:
-            mask_len = len(self.groups[group][0].in_mask.view(-1))
-            for module in self.groups[group]:
-                module.in_mask = noise_scale[mask_start:mask_start+mask_len]
-            mask_start += mask_len
-    
-    def mag_penalty(self):
-        if self.penalty is None:
-            return 0
-        # try negative and different factors and p
-        weight_list = None
-        for module, name in self.conv_names.items():
-            if self.group_modules is not None and module in self.group_modules:
-                continue
-            if weight_list is None:
-                weight_list = module.weight.view(-1)
-            else:
-                weight_list = torch.cat((weight_list,module.weight.view(-1)))
-                
-        for group in self.groups:
-            mask_len = len(self.groups[group][0].in_mask.view(-1))
-            for module in self.groups[group]:
-                weight_list = torch.cat((weight_list,module.weight.view(-1)))
-                
-        #sorted, indices = weight_list.sort(dim=0)
-        #num_groups,mult,noise_decay = 2,1,1e-1
-        #split_size = len(weight_list)//num_groups + 1
-        #ind_groups = torch.split(indices, split_size)
-        #for ind_group in ind_groups:
-        #    weight_list[ind_group] *= mult
-        #    mult *= noise_decay
-        
-        total_penalty = self.penalty[0] * torch.norm(weight_list,p=1) + self.penalty[1] * torch.norm(weight_list,p=2) + \
-                        self.penalty[2] * torch.norm(weight_list,p=3) + self.penalty[3] * torch.norm(weight_list,p=4) 
-        #total_penalty = -1e-4 * torch.norm(weight_list,p=1) - 1e-4 * torch.norm(weight_list,p=2)
-        
-        return total_penalty
             
     def accumulate_fishers(self):
         """Accumulate all the fisher during self.interval iterations."""
@@ -902,6 +846,7 @@ class FisherPruningHook():
                     conv2ancest[m] += [self.name2module[name]]
                 else:
                     ln2ancest[m] += [self.name2module[name]]
+                    print('ancestor:',name,m.name)
                     
             # find child
             if 'conv1' == n or 'bn1' == n:
@@ -921,6 +866,7 @@ class FisherPruningHook():
             
         self.conv2ancest = conv2ancest
         self.ln2ancest = ln2ancest
+        exit(0)
 
     def add_pruning_attrs(self, module, pruning=False):
         """When module is conv, add `finetune` attribute, register `mask` buffer
@@ -935,8 +881,7 @@ class FisherPruningHook():
         # same group same softmask
         module.finetune = not pruning
         if type(module).__name__ == 'Conv2d':
-            all_ones = module.weight.new_ones(module.in_channels,)
-            module.register_buffer('in_mask', all_ones)
+            module.register_buffer('in_mask', module.weight.new_ones(module.in_channels,))
             def modified_forward(m, x):
                 if not m.finetune:
                     mask = m.in_mask.view(1,-1,1,1)
