@@ -224,23 +224,21 @@ class FisherPruningHook():
             save_dir = f'metrics/logq3_s1/'
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
-        fig, axs = plt.subplots(ncols=5, figsize=(20,4))
+        fig, axs = plt.subplots(ncols=2, figsize=(10,4))
         # plots
-        self.fisher_info_list[self.fisher_info_list==0] = 1e-50
-        self.fisher_info_list = torch.log10(self.fisher_info_list).detach().cpu().numpy()
-        sns.histplot(self.fisher_info_list, ax=axs[0])
-        self.grad_info_list[self.grad_info_list==0] = 1e-50
-        self.grad_info_list = torch.log10(self.grad_info_list).detach().cpu().numpy()
-        sns.histplot(self.grad_info_list, ax=axs[1])
-        self.mag_info_list[self.mag_info_list==0] = 1e-50
-        self.mag_info_list = torch.log10(self.mag_info_list).detach().cpu().numpy()
-        sns.histplot(self.mag_info_list, ax=axs[2])
-        self.weight_mag[self.weight_mag==0] = 1e-50
-        self.weight_mag = torch.log10(self.weight_mag).detach().cpu().numpy()
-        sns.histplot(self.weight_mag, ax=axs[3])
+        #self.fisher_info_list[self.fisher_info_list==0] = 1e-50
+        #self.fisher_info_list = torch.log10(self.fisher_info_list).detach().cpu().numpy()
+        #sns.histplot(self.fisher_info_list, ax=axs[0])
+        #self.grad_info_list[self.grad_info_list==0] = 1e-50
+        #self.grad_info_list = torch.log10(self.grad_info_list).detach().cpu().numpy()
+        #sns.histplot(self.grad_info_list, ax=axs[1])
+        #self.mag_info_list[self.mag_info_list==0] = 1e-50
+        #self.mag_info_list = torch.log10(self.mag_info_list).detach().cpu().numpy()
+        #sns.histplot(self.mag_info_list, ax=axs[2])
+        sns.histplot(self.scale_factors.detach().cpu().numpy(), ax=axs[0])
         self.scale_factors[self.scale_factors==0] = 1e-50
         self.scale_factors = torch.log10(self.scale_factors).detach().cpu().numpy()
-        sns.histplot(self.scale_factors, ax=axs[4])
+        sns.histplot(self.scale_factors, ax=axs[1])
         fig.savefig(save_dir + f'{self.iter:03d}_{print_str}.png')
         plt.close('all')
         self.iter += 1
@@ -431,7 +429,6 @@ class FisherPruningHook():
             self.fisher_info_list = torch.cat((self.fisher_info_list,fisher[in_mask.bool()].view(-1)))
             self.mag_info_list = torch.cat((self.mag_info_list,mag[in_mask.bool()].view(-1)))
             self.grad_info_list = torch.cat((self.grad_info_list,grad[in_mask.bool()].view(-1)))
-            self.weight_mag = torch.cat((self.weight_mag,module.weight.data.view(-1)))
             bn_module = self.name2module[module.name.replace('conv','bn')]
             self.scale_factors = torch.cat((self.scale_factors,torch.abs(bn_module.weight.data.view(-1))))
             info.update(
@@ -449,7 +446,6 @@ class FisherPruningHook():
         self.fisher_info_list = torch.tensor([]).cuda()
         self.mag_info_list = torch.tensor([]).cuda()
         self.grad_info_list = torch.tensor([]).cuda()
-        self.weight_mag = torch.tensor([]).cuda()
         self.scale_factors = torch.tensor([]).cuda()
         info.update(self.single_prune(info, self.group_modules))
         for group in self.groups:
@@ -470,7 +466,6 @@ class FisherPruningHook():
             self.mag_info_list = torch.cat((self.mag_info_list,mag[in_mask.bool()].view(-1)))
             self.grad_info_list = torch.cat((self.grad_info_list,grad[in_mask.bool()].view(-1)))
             for module in self.groups[group]:
-                self.weight_mag = torch.cat((self.weight_mag,module.weight.data.view(-1)))
                 bn_module = self.name2module[module.name.replace('conv','bn')]
                 self.scale_factors = torch.cat((self.scale_factors,torch.abs(bn_module.weight.data.view(-1))))
             info.update(self.find_pruning_channel(group, fisher, in_mask, info))
@@ -499,11 +494,32 @@ class FisherPruningHook():
         decay_factor = 1e-3
         self.ista_err_bins = [0 for _ in range(num_bins)]
         self.ista_cnt_bins = [0 for _ in range(num_bins)]
+        # 1. distance modification, moderate change
+        # 2. bin oriented, good for distribution
+        
+        
+            
+        # total channels
+        total_channels = 0
+        for module, name in self.conv_names.items():
+            if self.group_modules is not None and module in self.group_modules:
+                continue
+            total_channels += len(bn_module.weight.data)
+            
+        for group in self.groups:
+            for module in self.groups[group]:
+                bn_module = self.name2module[module.name.replace('conv','bn')]
+                total_channels += len(bn_module.weight.data)
+        
+        print('channels:',total_channels)
+                
+        return
         
         def exp_quantization(x):
             x = torch.clamp(torch.abs(x), min=1e-8) * torch.sign(x)
             bins = torch.pow(10.,torch.tensor([bin_start+bin_stride*x for x in range(num_bins)])).to(x.device)
             dist = torch.abs(torch.log10(torch.abs(x).unsqueeze(-1)/bins))
+            # adjust distance with distribution?
             _,min_idx = dist.min(dim=-1)
             all_err = torch.log10(bins[min_idx]/torch.abs(x))
             abs_err = torch.abs(all_err)
@@ -528,7 +544,6 @@ class FisherPruningHook():
                 bn_module.weight.data = exp_quantization(bn_module.weight.data)
             
         for group in self.groups:
-            mask_len = len(self.groups[group][0].in_mask.view(-1))
             for module in self.groups[group]:
                 bn_module = self.name2module[module.name.replace('conv','bn')]
                 with torch.no_grad():
