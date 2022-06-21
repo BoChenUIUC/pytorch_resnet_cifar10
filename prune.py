@@ -111,7 +111,6 @@ class FisherPruningHook():
         self.total_flops = self.total_acts = 0
         
         self.iter = 0
-        self.use_mask = True
 
     def after_build_model(self, model):
         """Remove all pruned channels in finetune stage.
@@ -222,7 +221,7 @@ class FisherPruningHook():
         if self.penalty is not None:
             save_dir = f'metrics/L{int(-math.log10(max(1e-8,abs(self.penalty[0]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[1]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[2]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[3]))))}/'
         else:
-            save_dir = f'metrics/lq3/'
+            save_dir = f'metrics/lq3_s2/'
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         fig, axs = plt.subplots(ncols=5, figsize=(24,4))
@@ -507,10 +506,10 @@ class FisherPruningHook():
                 
     def ista(self):
         self.ista_err = torch.tensor([0.0]).cuda(0)
-        num_bins = 9
-        bin_start = -8
-        bin_stride = 1
-        bin_width = 1e-1
+        num_bins = 5
+        bin_start = -7
+        bin_stride = 2
+        bin_width = 2e-1
         decay_factor = 1e-3
         self.ista_err_bins = [0 for _ in range(num_bins)]
         self.ista_cnt_bins = [0 for _ in range(num_bins)]
@@ -939,15 +938,14 @@ class FisherPruningHook():
             all_ones = module.weight.new_ones(module.in_channels,)
             module.register_buffer('in_mask', all_ones)
             def modified_forward(m, x):
-                if self.use_mask:
-                    if not m.finetune:
-                        mask = m.in_mask.view(1,-1,1,1)
-                        x = x * mask.to(x.device)
-                    else:
-                        # if it has no ancestor
-                        # we need to mask it
-                        if x.size(1) == len(m.in_mask):
-                            x = x[:,m.in_mask.bool(),:,:]
+                if not m.finetune:
+                    mask = m.in_mask.view(1,-1,1,1)
+                    x = x * mask.to(x.device)
+                else:
+                    # if it has no ancestor
+                    # we need to mask it
+                    if x.size(1) == len(m.in_mask):
+                        x = x[:,m.in_mask.bool(),:,:]
                 output = F.conv2d(x, m.weight, m.bias, m.stride, m.padding, m.dilation, m.groups)
                 m.output_size = output.size()
                 return output
