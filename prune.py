@@ -504,6 +504,7 @@ class FisherPruningHook():
         for module, name in self.conv_names.items():
             if self.group_modules is not None and module in self.group_modules:
                 continue
+            bn_module = self.name2module[module.name.replace('conv','bn')]
             total_channels += len(bn_module.weight.data)
             
         for group in self.groups:
