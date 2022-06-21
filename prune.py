@@ -221,10 +221,10 @@ class FisherPruningHook():
         if self.penalty is not None:
             save_dir = f'metrics/L{int(-math.log10(max(1e-8,abs(self.penalty[0]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[1]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[2]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[3]))))}/'
         else:
-            save_dir = f'metrics/lq3_s2/'
+            save_dir = f'metrics/base/'
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
-        fig, axs = plt.subplots(ncols=5, figsize=(24,4))
+        fig, axs = plt.subplots(ncols=5, figsize=(20,4))
         # plots
         self.fisher_info_list[self.fisher_info_list==0] = 1e-50
         self.fisher_info_list = torch.log10(self.fisher_info_list).detach().cpu().numpy()
@@ -232,15 +232,15 @@ class FisherPruningHook():
         self.grad_info_list[self.grad_info_list==0] = 1e-50
         self.grad_info_list = torch.log10(self.grad_info_list).detach().cpu().numpy()
         sns.histplot(self.grad_info_list, ax=axs[1])
-        self.rev_cost_list[self.rev_cost_list==0] = 1e-50
-        self.rev_cost_list = torch.log10(self.rev_cost_list).detach().cpu().numpy()
-        sns.histplot(self.rev_cost_list, ax=axs[2])
         self.mag_info_list[self.mag_info_list==0] = 1e-50
         self.mag_info_list = torch.log10(self.mag_info_list).detach().cpu().numpy()
-        sns.histplot(self.mag_info_list, ax=axs[3])
+        sns.histplot(self.mag_info_list, ax=axs[2])
         self.weight_mag[self.weight_mag==0] = 1e-50
         self.weight_mag = torch.log10(self.weight_mag).detach().cpu().numpy()
-        sns.histplot(self.weight_mag, ax=axs[4])
+        sns.histplot(self.weight_mag, ax=axs[3])
+        self.scale_factors[self.scale_factors==0] = 1e-50
+        self.scale_factors = torch.log10(self.scale_factors).detach().cpu().numpy()
+        sns.histplot(self.scale_factors, ax=axs[4])
         fig.savefig(save_dir + f'{self.iter:03d}_{print_str}.png')
         plt.close('all')
         self.iter += 1
@@ -426,18 +426,14 @@ class FisherPruningHook():
                 for ancestor in ancestors:
                     delta_acts += self.acts[ancestor] / ancestor.out_channels
                 fisher /= (float(max(delta_acts, 1.)) / 1e6)
-                #mag /= (float(max(delta_acts, 1.)) / 1e6)
-                #grad /= (float(max(delta_acts, 1.)) / 1e6)
-                # test
-                rev_cost = torch.tensor([1./(float(max(delta_acts, 1.)) / 1e6)]).cuda()
-                self.cost_values.add(1./(float(max(delta_acts, 1.)) / 1e6))
-                grad = mag/(float(max(delta_acts, 1.)) / 1e6)
-                module.cost = 1./(float(max(delta_acts, 1.)) / 1e6)
+                mag /= (float(max(delta_acts, 1.)) / 1e6)
+                grad /= (float(max(delta_acts, 1.)) / 1e6)
             self.fisher_info_list = torch.cat((self.fisher_info_list,fisher[in_mask.bool()].view(-1)))
             self.mag_info_list = torch.cat((self.mag_info_list,mag[in_mask.bool()].view(-1)))
             self.grad_info_list = torch.cat((self.grad_info_list,grad[in_mask.bool()].view(-1)))
-            self.rev_cost_list = torch.cat((self.rev_cost_list,rev_cost.repeat(len(in_mask))))
             self.weight_mag = torch.cat((self.weight_mag,module.weight.data.view(-1)))
+            bn_module = self.name2module[module.name.replace('conv','bn')]
+            self.scale_factors = torch.cat((self.scale_factors,torch.abs(bn_module.weight.data.view(-1))))
             info.update(
                 self.find_pruning_channel(module, fisher, in_mask, info))
                 
@@ -454,8 +450,6 @@ class FisherPruningHook():
         self.mag_info_list = torch.tensor([]).cuda()
         self.grad_info_list = torch.tensor([]).cuda()
         self.weight_mag = torch.tensor([]).cuda()
-        self.rev_cost_list = torch.tensor([]).cuda()
-        self.cost_values = set()
         info.update(self.single_prune(info, self.group_modules))
         for group in self.groups:
             # they share the same in mask
@@ -469,25 +463,16 @@ class FisherPruningHook():
                 grad /= float(self.flops[group] / 1e9)
             elif self.delta == 'acts':
                 fisher /= float(self.acts[group] / 1e6)
-                #mag /= float(self.acts[group] / 1e6)
-                #grad /= float(self.acts[group] / 1e6)
-                # test
-                rev_cost = torch.tensor([1./float(self.acts[group] / 1e6)]).cuda()
-                self.cost_values.add(1./float(self.acts[group] / 1e6))
-                grad = mag/float(self.acts[group] / 1e6)
-                for module in self.groups[group]:
-                    module.cost = 1./float(self.acts[group] / 1e6)
-                # test
+                mag /= float(self.acts[group] / 1e6)
+                grad /= float(self.acts[group] / 1e6)
             self.fisher_info_list = torch.cat((self.fisher_info_list,fisher[in_mask.bool()].view(-1)))
             self.mag_info_list = torch.cat((self.mag_info_list,mag[in_mask.bool()].view(-1)))
             self.grad_info_list = torch.cat((self.grad_info_list,grad[in_mask.bool()].view(-1)))
-            self.rev_cost_list = torch.cat((self.rev_cost_list,rev_cost.repeat(len(in_mask))))
             for module in self.groups[group]:
                 self.weight_mag = torch.cat((self.weight_mag,module.weight.data.view(-1)))
+                bn_module = self.name2module[module.name.replace('conv','bn')]
+                self.scale_factors = torch.cat((self.scale_factors,torch.abs(bn_module.weight.data.view(-1))))
             info.update(self.find_pruning_channel(group, fisher, in_mask, info))
-            
-        # sort cost values
-        self.cost_values = sorted(self.cost_values)
                 
         module, channel = info['module'], info['channel']
         if self.penalty is not None:
@@ -513,6 +498,7 @@ class FisherPruningHook():
         decay_factor = 1e-3
         self.ista_err_bins = [0 for _ in range(num_bins)]
         self.ista_cnt_bins = [0 for _ in range(num_bins)]
+        self.scale_factors = torch.tensor([]).cuda()
         return
         
         def exp_quantization(x):
@@ -538,15 +524,12 @@ class FisherPruningHook():
             
         for module, name in self.conv_names.items():
             if self.group_modules is not None and module in self.group_modules:
-                continue
-            with torch.no_grad():
-                module.weight.data = exp_quantization(module.weight)  
+                continue  
                 
         for group in self.groups:
             mask_len = len(self.groups[group][0].in_mask.view(-1))
             for module in self.groups[group]:
-                with torch.no_grad():
-                    module.weight.data = exp_quantization(module.weight)
+                continue
             
     def accumulate_fishers(self):
         """Accumulate all the fisher during self.interval iterations."""
@@ -810,7 +793,6 @@ class FisherPruningHook():
         """
         import re
         conv2ancest = {}
-        ln2ancest = {}
         for n, m in model.named_modules():
             if type(m).__name__ not in ['Conv2d','BatchNorm2d']:
                 continue
@@ -839,14 +821,9 @@ class FisherPruningHook():
 
             if type(m).__name__ in ['Conv2d']:
                 conv2ancest[m] = []
-            else:
-                ln2ancest[m] = []
             for name in ancest_name:
                 if type(m).__name__ in ['Conv2d']:
                     conv2ancest[m] += [self.name2module[name]]
-                else:
-                    ln2ancest[m] += [self.name2module[name]]
-                    print('ancestor:',name,m.name)
                     
             # find child
             if 'conv1' == n or 'bn1' == n:
@@ -865,8 +842,6 @@ class FisherPruningHook():
                         m.child = f'layer{a}.{int(b)+1}.conv1'
             
         self.conv2ancest = conv2ancest
-        self.ln2ancest = ln2ancest
-        exit(0)
 
     def add_pruning_attrs(self, module, pruning=False):
         """When module is conv, add `finetune` attribute, register `mask` buffer
