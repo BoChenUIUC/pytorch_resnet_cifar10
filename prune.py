@@ -514,7 +514,6 @@ class FisherPruningHook():
         
         print('channels:',total_channels)
                 
-        return
         
         def exp_quantization(x):
             x = torch.clamp(torch.abs(x), min=1e-8) * torch.sign(x)
