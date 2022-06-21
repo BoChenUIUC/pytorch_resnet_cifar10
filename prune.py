@@ -221,7 +221,7 @@ class FisherPruningHook():
         if self.penalty is not None:
             save_dir = f'metrics/L{int(-math.log10(max(1e-8,abs(self.penalty[0]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[1]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[2]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[3]))))}/'
         else:
-            save_dir = f'metrics/base/'
+            save_dir = f'metrics/logq3_s1/'
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         fig, axs = plt.subplots(ncols=5, figsize=(20,4))
@@ -493,13 +493,12 @@ class FisherPruningHook():
     def ista(self):
         self.ista_err = torch.tensor([0.0]).cuda(0)
         num_bins = 5
-        bin_start = -7
-        bin_stride = 2
-        bin_width = 2e-1
+        bin_start = -4
+        bin_stride = 1
+        bin_width = 1e-1
         decay_factor = 1e-3
         self.ista_err_bins = [0 for _ in range(num_bins)]
         self.ista_cnt_bins = [0 for _ in range(num_bins)]
-        return
         
         def exp_quantization(x):
             x = torch.clamp(torch.abs(x), min=1e-8) * torch.sign(x)
@@ -518,18 +517,22 @@ class FisherPruningHook():
             # modification of weights
             sn = torch.sign(torch.log(bins[min_idx]/torch.abs(x)))
             multiplier = 10**(sn*bin_stride*decay_factor) 
-            #multiplier = 10**(torch.log10(bins[min_idx]/torch.abs(x))*decay_factor)
             x[abs_err>bin_width] *= multiplier[abs_err>bin_width]
             return x
             
         for module, name in self.conv_names.items():
             if self.group_modules is not None and module in self.group_modules:
                 continue  
-                
+            bn_module = self.name2module[module.name.replace('conv','bn')]
+            with torch.no_grad():
+                bn_module.weight.data = exp_quantization(bn_module.weight.data)
+            
         for group in self.groups:
             mask_len = len(self.groups[group][0].in_mask.view(-1))
             for module in self.groups[group]:
-                continue
+                bn_module = self.name2module[module.name.replace('conv','bn')]
+                with torch.no_grad():
+                    bn_module.weight.data = exp_quantization(bn_module.weight.data)
             
     def accumulate_fishers(self):
         """Accumulate all the fisher during self.interval iterations."""
