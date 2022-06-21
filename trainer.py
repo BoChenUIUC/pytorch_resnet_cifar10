@@ -280,7 +280,9 @@ def validate(val_loader, model, criterion, hook):
                           top1=top1))
 
     ista_err = hook.ista_err.cpu().item()
-    print(f' * Prec@1 {top1.avg:.3f}. Loss {losses.avg:.4f}. BinErr:', " ".join(format(x, ".3f") for x in hook.ista_err_bins))
+    print(f' * Prec@1 {top1.avg:.3f}. Loss {losses.avg:.4f}.')
+    print('BinErr:', " ".join(format(x, ".3f") for x in hook.ista_err_bins))
+    print('BinCnt:', " ".join(format(x, "05d") for x in hook.ista_cnt_bins))
           
     print_str = f"{top1.avg:.3f}_{losses.avg:.4f}_{ista_err:.4f}"
     hook.plot(print_str)

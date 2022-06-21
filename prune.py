@@ -222,7 +222,7 @@ class FisherPruningHook():
         if self.penalty is not None:
             save_dir = f'metrics/L{int(-math.log10(max(1e-8,abs(self.penalty[0]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[1]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[2]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[3]))))}/'
         else:
-            save_dir = f'metrics/lq3_s2/'
+            save_dir = f'metrics/lq2_s2/'
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         fig, axs = plt.subplots(ncols=5, figsize=(24,4))
@@ -513,6 +513,7 @@ class FisherPruningHook():
         bin_width = 1e-1
         decay_factor = 1e-3
         self.ista_err_bins = [0 for _ in range(num_bins)]
+        self.ista_cnt_bins = [0 for _ in range(num_bins)]
         
         def exp_quantization(x):
             x = torch.clamp(torch.abs(x), min=1e-8) * torch.sign(x)
@@ -527,6 +528,7 @@ class FisherPruningHook():
             for i in range(num_bins):
                 if torch.sum(min_idx==i)>0:
                     self.ista_err_bins[i] += abs_err[min_idx==i].sum().cpu().item()
+                    self.ista_cnt_bins[i] += torch.numel(abs_err[min_idx==i])
             # modification of weights
             sn = torch.sign(torch.log(bins[min_idx]/torch.abs(x)))
             multiplier = 10**(sn*bin_stride*decay_factor) 
