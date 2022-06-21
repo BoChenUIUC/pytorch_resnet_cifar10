@@ -450,6 +450,7 @@ class FisherPruningHook():
         self.mag_info_list = torch.tensor([]).cuda()
         self.grad_info_list = torch.tensor([]).cuda()
         self.weight_mag = torch.tensor([]).cuda()
+        self.scale_factors = torch.tensor([]).cuda()
         info.update(self.single_prune(info, self.group_modules))
         for group in self.groups:
             # they share the same in mask
@@ -498,7 +499,6 @@ class FisherPruningHook():
         decay_factor = 1e-3
         self.ista_err_bins = [0 for _ in range(num_bins)]
         self.ista_cnt_bins = [0 for _ in range(num_bins)]
-        self.scale_factors = torch.tensor([]).cuda()
         return
         
         def exp_quantization(x):
