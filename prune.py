@@ -507,9 +507,9 @@ class FisherPruningHook():
                 
     def ista(self):
         self.ista_err = torch.tensor([0.0]).cuda(0)
-        num_bins = 9
+        num_bins = 5
         bin_start = -8
-        bin_stride = 1
+        bin_stride = 2
         bin_width = 1e-1
         decay_factor = 1e-3
         self.ista_err_bins = [0 for _ in range(num_bins)]
