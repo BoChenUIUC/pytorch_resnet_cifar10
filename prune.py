@@ -572,7 +572,7 @@ class FisherPruningHook():
             print(bins[bin_idx],dist)
             not_assigned = remain.nonzero()
             ch_imp = dist[not_assigned]
-            sorted_ch_imp,ch_indices = ch_imp.sort()
+            sorted_ch_imp,ch_indices = ch_imp.sort(dim=0)
             print(sorted_ch_imp)
             selected = not_assigned[:ch_per_bin]
             remain[selected] = 0
