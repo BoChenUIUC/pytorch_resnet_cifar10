@@ -569,9 +569,11 @@ class FisherPruningHook():
         for bin_idx in bin_indices[:-1]:
             dist = torch.abs(torch.log10(bins[bin_idx]/all_scale_factors)) 
             not_assigned = remain.nonzero()
-            ch_imp = dist[not_assigned]
-            tmp,ch_indices = ch_imp.sort(dim=0)
-            selected = ch_indices[:ch_per_bin]
+            # remaining channels importance
+            chan_imp = dist[not_assigned] 
+            tmp,ch_indices = chan_imp.sort(dim=0)
+            selected_in_remain = ch_indices[:ch_per_bin]
+            selected = not_assigned[selected_in_remain]
             remain[selected] = 0
             assignment[selected] = bin_idx
             print(len(not_assigned),ch_per_bin,tmp)
