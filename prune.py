@@ -488,8 +488,8 @@ class FisherPruningHook():
     def ista(self):
         self.ista_err = torch.tensor([0.0]).cuda(0)
         # locations of bins
-        num_bins = 3
-        bin_start = -4
+        num_bins = 4
+        bin_start = -6
         # distance between bins
         bin_stride = 2
         # how centralize the bin is
@@ -501,7 +501,7 @@ class FisherPruningHook():
         # small: maintain good performance but may not affect distribution much
         decay_factor = 1e-3 
         # how small/low rank bins get more advantage
-        amp_factors = torch.tensor([4.,3.,1.]).cuda()
+        amp_factors = torch.tensor([8.,4.,2.,1.]).cuda()
         self.ista_err_bins = [0 for _ in range(num_bins)]
         self.ista_cnt_bins = [0 for _ in range(num_bins)]
         
