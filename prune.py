@@ -566,8 +566,10 @@ class FisherPruningHook():
         assigned = torch.zeros(total_channels).long().cuda()
         assignment = torch.zeros(total_channels).long().cuda()
         
+        print(bin_indices)
         for bin_idx in bin_indices[:-1]:
             dist = torch.abs(all_scale_factors - bins[bin_idx])
+            print(dist)
             nonzero = assigned.nonzero()
             ch_imp = dist[nonzero]
             _,ch_indices = ch_imp.sort()
@@ -575,6 +577,9 @@ class FisherPruningHook():
             assigned[selected] = 1
             assignment[selected] = bin_idx
         assignment[assigned==0] = bin_indices[-1]
+        print(all_scale_factors)
+        print(assignment)
+        exit(0)
         
         ch_start = 0
         for module, name in self.conv_names.items():
@@ -593,7 +598,6 @@ class FisherPruningHook():
                     ch_len = len(bn_module.weight.data)
                     bn_module.weight.data = redistribute(bn_module.weight.data, bins[assignment[ch_start:ch_start+ch_len]])
                 ch_start += ch_len
-        print(ch_start)
             
     def accumulate_fishers(self):
         """Accumulate all the fisher during self.interval iterations."""
