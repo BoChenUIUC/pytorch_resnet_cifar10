@@ -563,7 +563,6 @@ class FisherPruningHook():
         total_channels = len(all_scale_factors)
         ch_per_bin = total_channels//num_bins
         sorted_cnt,bin_indices = torch.tensor(self.ista_cnt_bins).sort()
-        print(sorted_cnt)
         remain = torch.ones(total_channels).long().cuda()
         assignment = torch.zeros(total_channels).long().cuda()
         
@@ -578,8 +577,8 @@ class FisherPruningHook():
             remain[selected] = 0
             assignment[selected] = bin_idx
         assignment[remain.nonzero()] = bin_indices[-1]
-        print(all_scale_factors)
-        print(assignment)
+        print(all_scale_factors[100:])
+        print(assignment[100:])
         exit(0)
         
         ch_start = 0
