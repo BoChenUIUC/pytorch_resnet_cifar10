@@ -499,7 +499,7 @@ class FisherPruningHook():
         # trade-off of original distribution and new distribution
         # big: easy to get new distribution, but may degrade performance
         # small: maintain good performance but may not affect distribution much
-        decay_factor = 1e-3 # lower this to improve perf
+        decay_factor = 1e-4 # lower this to improve perf
         # how small/low rank bins get more advantage
         amp_factors = torch.tensor([8.,4.,2.,1.]).cuda()
         self.ista_err_bins = [0 for _ in range(num_bins)]
