@@ -566,20 +566,15 @@ class FisherPruningHook():
         remain = torch.ones(total_channels).long().cuda()
         assignment = torch.zeros(total_channels).long().cuda()
         
-        print(bin_indices)
         for bin_idx in bin_indices[:-1]:
             dist = torch.abs(torch.log10(bins[bin_idx]/all_scale_factors)) 
-            print(bins[bin_idx])
             not_assigned = remain.nonzero()
             ch_imp = dist[not_assigned]
-            sorted_ch_imp,ch_indices = ch_imp.sort(dim=0)
+            _,ch_indices = ch_imp.sort(dim=0)
             selected = ch_indices[:ch_per_bin]
             remain[selected] = 0
             assignment[selected] = bin_idx
         assignment[remain.nonzero()] = bin_indices[-1]
-        print(all_scale_factors[:100])
-        print(assignment[:100])
-        exit(0)
         
         ch_start = 0
         for module, name in self.conv_names.items():
