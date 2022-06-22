@@ -575,6 +575,7 @@ class FisherPruningHook():
             sorted_ch_imp,ch_indices = ch_imp.sort(dim=0)
             selected = not_assigned[:ch_per_bin]
             remain[selected] = 0
+            print(selected)
             assignment[selected] = bin_idx
         assignment[remain.nonzero()] = bin_indices[-1]
         print(all_scale_factors[:100])
