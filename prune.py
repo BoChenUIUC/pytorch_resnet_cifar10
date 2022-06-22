@@ -569,7 +569,7 @@ class FisherPruningHook():
         print(bin_indices)
         for bin_idx in bin_indices[:-1]:
             dist = torch.abs(torch.log10(bins[bin_idx]/all_scale_factors)) 
-            print(bins[bin_idx],len(selected),dist)
+            print(bins[bin_idx],dist)
             not_assigned = remain.nonzero()
             ch_imp = dist[not_assigned]
             sorted_ch_imp,ch_indices = ch_imp.sort()
