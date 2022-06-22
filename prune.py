@@ -221,7 +221,7 @@ class FisherPruningHook():
         if self.penalty is not None:
             save_dir = f'metrics/L{int(-math.log10(max(1e-8,abs(self.penalty[0]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[1]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[2]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[3]))))}/'
         else:
-            save_dir = f'metrics/re3_n3_s2/'
+            save_dir = f'metrics/re3_n3_s2_v2/'
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         fig, axs = plt.subplots(ncols=2, figsize=(10,4))
@@ -487,12 +487,21 @@ class FisherPruningHook():
                 
     def ista(self):
         self.ista_err = torch.tensor([0.0]).cuda(0)
+        # locations of bins
         num_bins = 3
         bin_start = -4
+        # distance between bins
         bin_stride = 2
+        # how centralize the bin is
         bin_width = 1e-1
+        # locations we want to quantize
         bins = torch.pow(10.,torch.tensor([bin_start+bin_stride*x for x in range(num_bins)])).cuda(0)
-        decay_factor = 1e-3
+        # trade-off of original distribution and new distribution
+        # big: easy to get new distribution, but may degrade performance
+        # small: maintain good performance but may not affect distribution much
+        decay_factor = 1e-3 
+        # how small/low rank bins get more advantage
+        amp_factor = 2
         self.ista_err_bins = [0 for _ in range(num_bins)]
         self.ista_cnt_bins = [0 for _ in range(num_bins)]
         # 1. distance modification, moderate change
@@ -535,8 +544,13 @@ class FisherPruningHook():
         def redistribute(x,tar_bins):
             all_err = torch.log10(tar_bins/torch.abs(x))
             abs_err = torch.abs(all_err)
-            motion = torch.log10(tar_bins/torch.abs(x))
-            multiplier = 10**(motion*decay_factor) 
+            # more distant larger multiplier
+            # pull force relates to distance and target bin (how off-distribution is it?)
+            # low rank bin gets higher pull force
+            distance = torch.log10(tar_bins/torch.abs(x))
+            # amplifier based on rank of bin
+            amp = amp_factor**(-torch.log10(tar_bins))
+            multiplier = amp * 10**(distance*decay_factor) 
             x[abs_err>bin_width] *= multiplier[abs_err>bin_width]
             return x
             
