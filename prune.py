@@ -538,7 +538,7 @@ class FisherPruningHook():
             x[abs_err>bin_width] *= multiplier[abs_err>bin_width]
             return x
             
-        all_scale_factors = torch.tensor([])
+        all_scale_factors = torch.tensor([]).cuda()
             
         for module, name in self.conv_names.items():
             if self.group_modules is not None and module in self.group_modules:
