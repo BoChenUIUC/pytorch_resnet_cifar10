@@ -491,7 +491,7 @@ class FisherPruningHook():
         bin_start = -4
         bin_stride = 1
         bin_width = 1e-1
-        bins = torch.pow(10.,torch.tensor([bin_start+bin_stride*x for x in range(num_bins)])).to(x.device)
+        bins = torch.pow(10.,torch.tensor([bin_start+bin_stride*x for x in range(num_bins)])).cuda(0)
         decay_factor = 1e-3
         self.ista_err_bins = [0 for _ in range(num_bins)]
         self.ista_cnt_bins = [0 for _ in range(num_bins)]
