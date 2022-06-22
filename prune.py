@@ -550,7 +550,7 @@ class FisherPruningHook():
             distance = torch.log10(tar_bins/torch.abs(x))
             # amplifier based on rank of bin
             amp = amp_factor**(-torch.log10(tar_bins))
-            multiplier = amp * (10**(distance*decay_factor)) 
+            multiplier = 10**(distance*decay_factor*amp)
             x[abs_err>bin_width] *= multiplier[abs_err>bin_width]
             return x
             
