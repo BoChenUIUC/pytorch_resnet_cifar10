@@ -221,7 +221,7 @@ class FisherPruningHook():
         if self.penalty is not None:
             save_dir = f'metrics/L{int(-math.log10(max(1e-8,abs(self.penalty[0]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[1]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[2]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[3]))))}/'
         else:
-            save_dir = f'metrics/logq3_s1/'
+            save_dir = f'metrics/re/'
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         fig, axs = plt.subplots(ncols=2, figsize=(10,4))
@@ -491,35 +491,16 @@ class FisherPruningHook():
         bin_start = -4
         bin_stride = 1
         bin_width = 1e-1
+        bins = torch.pow(10.,torch.tensor([bin_start+bin_stride*x for x in range(num_bins)])).to(x.device)
         decay_factor = 1e-3
         self.ista_err_bins = [0 for _ in range(num_bins)]
         self.ista_cnt_bins = [0 for _ in range(num_bins)]
         # 1. distance modification, moderate change
         # 2. bin oriented, good for distribution
         
-        
-            
-        # total channels
-        total_channels = 0
-        for module, name in self.conv_names.items():
-            if self.group_modules is not None and module in self.group_modules:
-                continue
-            bn_module = self.name2module[module.name.replace('conv','bn')]
-            total_channels += len(bn_module.weight.data)
-            
-        for group in self.groups:
-            for module in self.groups[group]:
-                bn_module = self.name2module[module.name.replace('conv','bn')]
-                total_channels += len(bn_module.weight.data)
-        
-        print('channels:',total_channels)
-                
-        
         def exp_quantization(x):
             x = torch.clamp(torch.abs(x), min=1e-8) * torch.sign(x)
-            bins = torch.pow(10.,torch.tensor([bin_start+bin_stride*x for x in range(num_bins)])).to(x.device)
             dist = torch.abs(torch.log10(torch.abs(x).unsqueeze(-1)/bins))
-            # adjust distance with distribution?
             _,min_idx = dist.min(dim=-1)
             all_err = torch.log10(bins[min_idx]/torch.abs(x))
             abs_err = torch.abs(all_err)
@@ -536,18 +517,80 @@ class FisherPruningHook():
             x[abs_err>bin_width] *= multiplier[abs_err>bin_width]
             return x
             
+        def get_bin_distribution(x):
+            x = torch.clamp(torch.abs(x), min=1e-6) * torch.sign(x)
+            bins = torch.pow(10.,torch.tensor([bin_start+bin_stride*x for x in range(num_bins)])).to(x.device)
+            dist = torch.abs(torch.log10(torch.abs(x).unsqueeze(-1)/bins))
+            _,min_idx = dist.min(dim=-1)
+            all_err = torch.log10(bins[min_idx]/torch.abs(x))
+            abs_err = torch.abs(all_err)
+            # calculate total error
+            self.ista_err += abs_err.sum()
+            # calculating err for each bin
+            for i in range(num_bins):
+                if torch.sum(min_idx==i)>0:
+                    self.ista_err_bins[i] += abs_err[min_idx==i].sum().cpu().item()
+                    self.ista_cnt_bins[i] += torch.numel(abs_err[min_idx==i])
+                    
+        def redistribute(x,tar_bins):
+            motion = torch.log10(tar_bins/torch.abs(x))
+            multiplier = 10**(motion*decay_factor) 
+            x[abs_err>bin_width] *= multiplier[abs_err>bin_width]
+            return x
+            
+        all_scale_factors = torch.tensor([])
+            
         for module, name in self.conv_names.items():
             if self.group_modules is not None and module in self.group_modules:
                 continue  
             bn_module = self.name2module[module.name.replace('conv','bn')]
             with torch.no_grad():
-                bn_module.weight.data = exp_quantization(bn_module.weight.data)
+                #bn_module.weight.data = exp_quantization(bn_module.weight.data)
+                get_bin_distribution(bn_module.weight.data)
+            all_scale_factors = torch.cat((all_scale_factors,torch.abs(bn_module.weight.data)))
             
         for group in self.groups:
             for module in self.groups[group]:
                 bn_module = self.name2module[module.name.replace('conv','bn')]
                 with torch.no_grad():
-                    bn_module.weight.data = exp_quantization(bn_module.weight.data)
+                    #bn_module.weight.data = exp_quantization(bn_module.weight.data)
+                    get_bin_distribution(bn_module.weight.data)
+                all_scale_factors = torch.cat((all_scale_factors,torch.abs(bn_module.weight.data)))
+                    
+        # total channels
+        total_channels = len(all_scale_factors)
+        ch_per_bin = total_channels//num_bins
+        _,bin_indices = torch.tensor(self.ista_cnt_bins).sort()
+        assigned = torch.zeros_like(all_scale_factors)
+        assignment = torch.zeros_like(all_scale_factors)
+        
+        for bin_idx in bin_indices[:-1]:
+            dist = torch.abs(all_scale_factors - bins[bin_idx])
+            nonzero = assigned.nonzero()
+            ch_imp = dist[nonzero]
+            _,ch_indices = ch_imp.sort()
+            selected = nonzero[:ch_per_bin]
+            assigned[selected] = 1
+            assignment[selected] = bin_idx
+        assignment[assigned==0] = bin_indices[-1]
+        
+        ch_start = 0
+        for module, name in self.conv_names.items():
+            if self.group_modules is not None and module in self.group_modules:
+                continue  
+            bn_module = self.name2module[module.name.replace('conv','bn')]
+            with torch.no_grad():
+                ch_len = len(bn_module.weight.data)
+                bn_module.weight.data = redistribute(bn_module.weight.data, bins[assignment[ch_start:ch_start+ch_len]])
+            ch_start += ch_len
+            
+        for group in self.groups:
+            for module in self.groups[group]:
+                bn_module = self.name2module[module.name.replace('conv','bn')]
+                with torch.no_grad():
+                    ch_len = len(bn_module.weight.data)
+                    bn_module.weight.data = redistribute(bn_module.weight.data, bins[assignment[ch_start:ch_start+ch_len]])
+                ch_start += ch_len
             
     def accumulate_fishers(self):
         """Accumulate all the fisher during self.interval iterations."""
