@@ -576,6 +576,7 @@ class FisherPruningHook():
             assignment[selected] = bin_idx
             print(all_scale_factors[selected])
         assignment[remain.nonzero()] = bin_indices[-1]
+        exit(0)
         
         ch_start = 0
         for module, name in self.conv_names.items():
