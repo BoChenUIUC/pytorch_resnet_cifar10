@@ -571,7 +571,7 @@ class FisherPruningHook():
             dist = torch.abs(all_scale_factors - bins[bin_idx])
             print(bins[bin_idx],dist)
             nonzero = assigned.nonzero()
-            print(nonzero)
+            print(assigned,len(assigned))
             ch_imp = dist[nonzero]
             _,ch_indices = ch_imp.sort()
             selected = nonzero[:ch_per_bin]
