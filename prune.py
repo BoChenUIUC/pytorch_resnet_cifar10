@@ -501,11 +501,9 @@ class FisherPruningHook():
         # small: maintain good performance but may not affect distribution much
         decay_factor = 1e-3 
         # how small/low rank bins get more advantage
-        amp_factor = 2
+        amp_factors = torch.tensor([4.,3.,1.]).cuda()
         self.ista_err_bins = [0 for _ in range(num_bins)]
         self.ista_cnt_bins = [0 for _ in range(num_bins)]
-        # 1. distance modification, moderate change
-        # 2. bin oriented, good for distribution
         
         def exp_quantization(x):
             x = torch.clamp(torch.abs(x), min=1e-8) * torch.sign(x)
@@ -541,15 +539,16 @@ class FisherPruningHook():
                     self.ista_err_bins[i] += abs_err[min_idx==i].sum().cpu().item()
                     self.ista_cnt_bins[i] += torch.numel(abs_err[min_idx==i])
                     
-        def redistribute(x,tar_bins):
+        def redistribute(x,bin_indices):
+            tar_bins = bins[bin_indices]
+            # amplifier based on rank of bin
+            amp = amp_factors[bin_indices]
             all_err = torch.log10(tar_bins/torch.abs(x))
             abs_err = torch.abs(all_err)
             # more distant larger multiplier
             # pull force relates to distance and target bin (how off-distribution is it?)
             # low rank bin gets higher pull force
             distance = torch.log10(tar_bins/torch.abs(x))
-            # amplifier based on rank of bin
-            amp = amp_factor**(-torch.log10(tar_bins))
             multiplier = 10**(distance*decay_factor*amp)
             x[abs_err>bin_width] *= multiplier[abs_err>bin_width]
             return x
@@ -578,7 +577,7 @@ class FisherPruningHook():
         ch_per_bin = total_channels//num_bins
         _,bin_indices = torch.tensor(self.ista_cnt_bins).sort()
         remain = torch.ones(total_channels).long().cuda()
-        assignment = torch.zeros(total_channels).long().cuda()
+        assigned_binindices = torch.zeros(total_channels).long().cuda()
         
         for bin_idx in bin_indices[:-1]:
             dist = torch.abs(torch.log10(bins[bin_idx]/all_scale_factors)) 
@@ -589,8 +588,8 @@ class FisherPruningHook():
             selected_in_remain = ch_indices[:ch_per_bin]
             selected = not_assigned[selected_in_remain]
             remain[selected] = 0
-            assignment[selected] = bin_idx
-        assignment[remain.nonzero()] = bin_indices[-1]
+            assigned_binindices[selected] = bin_idx
+        assigned_binindices[remain.nonzero()] = bin_indices[-1]
         
         ch_start = 0
         for module, name in self.conv_names.items():
@@ -599,7 +598,7 @@ class FisherPruningHook():
             bn_module = self.name2module[module.name.replace('conv','bn')]
             with torch.no_grad():
                 ch_len = len(bn_module.weight.data)
-                bn_module.weight.data = redistribute(bn_module.weight.data, bins[assignment[ch_start:ch_start+ch_len]])
+                bn_module.weight.data = redistribute(bn_module.weight.data, assigned_binindices[ch_start:ch_start+ch_len])
             ch_start += ch_len
             
         for group in self.groups:
@@ -607,7 +606,7 @@ class FisherPruningHook():
                 bn_module = self.name2module[module.name.replace('conv','bn')]
                 with torch.no_grad():
                     ch_len = len(bn_module.weight.data)
-                    bn_module.weight.data = redistribute(bn_module.weight.data, bins[assignment[ch_start:ch_start+ch_len]])
+                    bn_module.weight.data = redistribute(bn_module.weight.data, assigned_binindices[ch_start:ch_start+ch_len])
                 ch_start += ch_len
             
     def accumulate_fishers(self):
