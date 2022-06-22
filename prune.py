@@ -577,8 +577,8 @@ class FisherPruningHook():
             remain[selected] = 0
             assignment[selected] = bin_idx
         assignment[remain.nonzero()] = bin_indices[-1]
-        print(all_scale_factors[100:])
-        print(assignment[100:])
+        print(all_scale_factors[:100])
+        print(assignment[:100])
         exit(0)
         
         ch_start = 0
