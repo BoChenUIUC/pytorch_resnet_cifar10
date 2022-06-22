@@ -533,6 +533,8 @@ class FisherPruningHook():
                     self.ista_cnt_bins[i] += torch.numel(abs_err[min_idx==i])
                     
         def redistribute(x,tar_bins):
+            all_err = torch.log10(tar_bins/torch.abs(x))
+            abs_err = torch.abs(all_err)
             motion = torch.log10(tar_bins/torch.abs(x))
             multiplier = 10**(motion*decay_factor) 
             x[abs_err>bin_width] *= multiplier[abs_err>bin_width]
