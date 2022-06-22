@@ -576,9 +576,7 @@ class FisherPruningHook():
             selected = not_assigned[selected_in_remain]
             remain[selected] = 0
             assignment[selected] = bin_idx
-            print(len(not_assigned),ch_per_bin,tmp)
         assignment[remain.nonzero()] = bin_indices[-1]
-        exit(0)
         
         ch_start = 0
         for module, name in self.conv_names.items():
