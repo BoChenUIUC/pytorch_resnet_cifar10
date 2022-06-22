@@ -561,8 +561,8 @@ class FisherPruningHook():
         total_channels = len(all_scale_factors)
         ch_per_bin = total_channels//num_bins
         _,bin_indices = torch.tensor(self.ista_cnt_bins).sort()
-        assigned = all_scale_factors.new_zeros(total_channels).cuda()
-        assignment = all_scale_factors.new_zeros(total_channels).cuda()
+        assigned = torch.zeros(total_channels).cuda()
+        assignment = torch.zeros(total_channels).cuda()
         
         for bin_idx in bin_indices[:-1]:
             dist = torch.abs(all_scale_factors - bins[bin_idx])
