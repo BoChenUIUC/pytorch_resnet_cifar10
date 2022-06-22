@@ -593,6 +593,7 @@ class FisherPruningHook():
                     ch_len = len(bn_module.weight.data)
                     bn_module.weight.data = redistribute(bn_module.weight.data, bins[assignment[ch_start:ch_start+ch_len]])
                 ch_start += ch_len
+        print(ch_start)
             
     def accumulate_fishers(self):
         """Accumulate all the fisher during self.interval iterations."""
