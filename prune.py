@@ -98,8 +98,6 @@ class FisherPruningHook():
         We add this function to ensure that this happens before DDP's
         optimizer's initialization
         """
-        if not self.pruning:
-            load_checkpoint(model, self.deploy_from)
         
         self.conv_names = OrderedDict() # prunable
         self.ln_names = OrderedDict()
@@ -117,7 +115,7 @@ class FisherPruningHook():
                 self.name2module[n] = m
                 
         if not self.pruning:
-            #load_checkpoint(model, self.deploy_from)
+            load_checkpoint(model, self.deploy_from)
             self.deploy_pruning(model)
             
         if self.start_from is not None:
@@ -128,6 +126,7 @@ class FisherPruningHook():
         calculating the importance of the channel, and use the layer-grouping
         algorithm to make the coupled module shared the mask of input
         channel."""
+
         if self.pruning:
             # divide the conv to several group and all convs in same
             # group used same input at least once in model's
@@ -567,14 +566,8 @@ class FisherPruningHook():
         if type(module).__name__ == 'Conv2d':
             module.register_buffer('in_mask', module.weight.new_ones(module.in_channels,))
             def modified_forward(m, x):
-                if not m.finetune:
-                    mask = m.in_mask.view(1,-1,1,1)
-                    x = x * mask.to(x.device)
-                else:
-                    # if it has no ancestor
-                    # we need to mask it
-                    if x.size(1) == len(m.in_mask):
-                        x = x[:,m.in_mask.bool(),:,:]
+                mask = m.in_mask.view(1,-1,1,1)
+                x = x * mask.to(x.device)
                 output = F.conv2d(x, m.weight, m.bias, m.stride, m.padding, m.dilation, m.groups)
                 m.output_size = output.size()
                 return output
