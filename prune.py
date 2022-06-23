@@ -368,12 +368,12 @@ class FisherPruningHook():
         ch_start = 0
         for module, name in self.conv_names.items():
             # find child of this module
-            ch_len = len(module.in_mask)
             if hasattr(module, 'child'):
                 child = self.name2module[module.child]
-                assert(len(child.in_mask) == ch_len)
-                child.in_mask = all_masks[ch_start:ch_start+ch_len]
+                ch_len = len(child.in_mask)
+                child.in_mask[:] = all_masks[ch_start:ch_start+ch_len]
             ch_start += ch_len
+        print(ch_start)
 
     def init_flops_acts(self):
         """Clear the flops and acts of model in last iter."""
