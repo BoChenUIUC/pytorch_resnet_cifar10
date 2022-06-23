@@ -140,7 +140,7 @@ def main():
 
     if args.evaluate:
         prec1 = validate(val_loader, model, criterion)
-        print_str = f"{top1.avg:.3f}"
+        print_str = f"Top1: {prec1:.3f}"
         hook.plot(print_str)
         return
 
