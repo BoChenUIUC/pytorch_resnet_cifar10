@@ -545,7 +545,8 @@ class FisherPruningHook():
             amp = amp_factors[bin_indices]
             all_err = torch.log10(tar_bins/torch.abs(x))
             abs_err = torch.abs(all_err)
-            abs_err[torch.log10(bins[-1]/torch.abs(x))<0] = 0
+            abs_err[bins[-1]<torch.abs(x)] = 0
+            abs_err[bins[0]>torch.abs(x)] = 0
             # more distant larger multiplier
             # pull force relates to distance and target bin (how off-distribution is it?)
             # low rank bin gets higher pull force
