@@ -367,13 +367,16 @@ class FisherPruningHook():
         # assign mask back
         ch_start = 0
         for module, name in self.conv_names.items():
-            # find child of this module
-            if hasattr(module, 'child'):
-                child = self.name2module[module.child]
-                ch_len = len(child.in_mask)
-                child.in_mask[:] = all_masks[ch_start:ch_start+ch_len]
+            bn_module = self.name2module[module.name.replace('conv','bn')]
+            with torch.no_grad():
+                ch_len = len(bn_module.weight.data)
+                bn_mask = all_masks[ch_start:ch_start+ch_len]
+                bn_module.weight.data[bn_mask] = 0
+            #if hasattr(module, 'child'):
+            #    child = self.name2module[module.child]
+            #    ch_len = len(child.in_mask)
+            #    child.in_mask[:] = all_masks[ch_start:ch_start+ch_len]
             ch_start += ch_len
-        print(ch_start)
 
     def init_flops_acts(self):
         """Clear the flops and acts of model in last iter."""
