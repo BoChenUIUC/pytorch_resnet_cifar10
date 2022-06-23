@@ -129,7 +129,7 @@ class FisherPruningHook():
             load_checkpoint(model, self.deploy_from)
             self.deploy_pruning(model)
 
-        self.print_model(model, print_flops_acts=False, print_channel=True)
+        self.print_model(model, print_flops_acts=False, print_channel=False)
 
     def after_backward(self, itr, model):
         if not self.pruning:
@@ -358,7 +358,8 @@ class FisherPruningHook():
             bn_module = self.name2module[module.name.replace('conv','bn')]
             all_scale_factors = torch.cat((all_scale_factors,torch.abs(bn_module.weight.data)))
                 
-        _,factor_indices = all_scale_factors.sort()
+        sorted,factor_indices = all_scale_factors.sort()
+        print(sorted)
         total_channels = len(all_scale_factors)
         prune_ratio = 0.25
         removed_channels = int(prune_ratio * total_channels)
