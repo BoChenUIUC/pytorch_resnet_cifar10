@@ -63,9 +63,6 @@ class FisherPruningHook():
         self.use_ista = use_ista
         self.delta = delta
         self.interval = interval
-        # The key of self.input is conv module, and value of it
-        # is list of conv' input_features in forward process
-        self.conv_inputs = {}
         # The key of self.flops is conv module, and value of it
         # is the summation of conv's flops in forward process
         self.flops = {}
@@ -115,16 +112,13 @@ class FisherPruningHook():
             elif isinstance(m, nn.BatchNorm2d):
                 self.ln_names[m] = n
                 self.name2module[n] = m
+        
+        self.set_group_masks(model)
 
         if self.pruning:
             # divide the conv to several group and all convs in same
             # group used same input at least once in model's
             # forward process.
-            model.eval()
-            self.set_group_masks(model)
-            model.train()
-            for conv, name in self.conv_names.items():
-                self.conv_inputs[conv] = []
             self.init_flops_acts()
             if self.resume_from is not None:
                 load_checkpoint(model, self.resume_from)
@@ -537,6 +531,10 @@ class FisherPruningHook():
                         m.child = f'layer{a}.{int(b)+1}.conv1'
             
         self.conv2ancest = conv2ancest
+        
+        for m in conv2ancest:
+            print(m.name,[x.name for x in conv2ancest[m]])
+        exit(0)
 
     def add_pruning_attrs(self, module, pruning=False):
         """When module is conv, add `finetune` attribute, register `mask` buffer
