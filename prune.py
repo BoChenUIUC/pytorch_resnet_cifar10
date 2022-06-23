@@ -542,7 +542,7 @@ class FisherPruningHook():
             
         self.conv2ancest = conv2ancest
         
-        for n, m in model.named_modules():
+        for m, n in self.conv_names.items():
             print(n, m.child)
         exit(0)
 
