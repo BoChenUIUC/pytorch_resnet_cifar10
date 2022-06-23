@@ -48,7 +48,7 @@ class FisherPruningHook():
     def __init__(
         self,
         pruning=True,
-        delta='acts',
+        delta='flops',
         interval=10,
         use_ista=False,
         deploy_from=None,
@@ -221,7 +221,7 @@ class FisherPruningHook():
         if self.penalty is not None:
             save_dir = f'metrics/L{int(-math.log10(max(1e-8,abs(self.penalty[0]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[1]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[2]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[3]))))}/'
         else:
-            save_dir = f'metrics/base/'
+            save_dir = f'metrics/logq/'
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         fig, axs = plt.subplots(ncols=2, figsize=(10,4))
@@ -489,11 +489,11 @@ class FisherPruningHook():
         self.ista_err = torch.tensor([0.0]).cuda(0)
         # locations of bins should fit original dist
         num_bins = 4
-        bin_start = -5
+        bin_start = -6
         # distance between bins min=2
         bin_stride = 2
         # how centralize the bin is
-        bin_width = 1e-1
+        bin_width = 2e-1
         # locations we want to quantize
         bins = torch.pow(10.,torch.tensor([bin_start+bin_stride*x for x in range(num_bins)])).cuda(0)
         # trade-off of original distribution and new distribution
