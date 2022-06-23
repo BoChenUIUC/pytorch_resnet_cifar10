@@ -488,8 +488,8 @@ class FisherPruningHook():
     def ista(self):
         self.ista_err = torch.tensor([0.0]).cuda(0)
         # locations of bins should fit original dist
-        num_bins = 4
-        bin_start = -6
+        num_bins = 3
+        bin_start = -4
         # distance between bins min=2
         bin_stride = 2
         # how centralize the bin is
