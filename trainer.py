@@ -88,8 +88,10 @@ def main():
             
     # optionally pruning
     if args.prune:
-        #hook = FisherPruningHook(pruning=True, start_from=args.prune, penalty=[-1e-6,-1e-4,0,0])
-        hook = FisherPruningHook(pruning=True, use_ista=True, resume_from=args.prune)
+        if not args.evaluate:
+            hook = FisherPruningHook(pruning=True, use_ista=True, resume_from=args.prune)
+        else:
+            hook = FisherPruningHook(pruning=False, use_ista=True, deploy_from=args.prune)
         hook.after_build_model(model)
         hook.before_run(model)
 
@@ -138,7 +140,9 @@ def main():
 
 
     if args.evaluate:
-        validate(val_loader, model, criterion)
+        prec1 = validate(val_loader, model, criterion)
+        print_str = f"{top1.avg:.3f}"
+        hook.plot(print_str)
         return
 
     for epoch in range(args.start_epoch, args.epochs):
@@ -150,6 +154,14 @@ def main():
 
         # evaluate on validation set
         prec1 = validate(val_loader, model, criterion, hook if args.prune else None)
+        
+        ista_err = hook.ista_err.cpu().item()
+        print(f' * Prec@1 {prec1:.3f}. ')
+        print('BinErr:', " ".join(format(x, ".3f") for x in hook.ista_err_bins))
+        print('BinCnt:', " ".join(format(x, "05d") for x in hook.ista_cnt_bins))
+              
+        print_str = f"{top1.avg:.3f}_{ista_err:.4f}"
+        hook.plot(print_str)
         
         # remember best prec@1 and save checkpoint
         is_best = prec1 > best_prec1
@@ -234,7 +246,7 @@ def train(train_loader, model, criterion, optimizer, epoch, hook):
                           data_time=data_time, loss=losses, top1=top1))
 
 
-def validate(val_loader, model, criterion, hook):
+def validate(val_loader, model, criterion):
     """
     Run evaluation
     """
@@ -278,14 +290,6 @@ def validate(val_loader, model, criterion, hook):
                       'Prec@1 {top1.val:.3f} ({top1.avg:.3f})'.format(
                           i, len(val_loader), batch_time=batch_time, loss=losses,
                           top1=top1))
-
-    ista_err = hook.ista_err.cpu().item()
-    print(f' * Prec@1 {top1.avg:.3f}. Loss {losses.avg:.4f}.')
-    print('BinErr:', " ".join(format(x, ".3f") for x in hook.ista_err_bins))
-    print('BinCnt:', " ".join(format(x, "05d") for x in hook.ista_cnt_bins))
-          
-    print_str = f"{top1.avg:.3f}_{losses.avg:.4f}_{ista_err:.4f}"
-    hook.plot(print_str)
 
     return top1.avg
 

@@ -54,7 +54,6 @@ class FisherPruningHook():
         deploy_from=None,
         resume_from=None,
         start_from=None,
-        penalty=None,
         save_flops_thr=[0.75, 0.5, 0.25],
         save_acts_thr=[0.75, 0.5, 0.25],
     ):
@@ -62,7 +61,6 @@ class FisherPruningHook():
         assert delta in ('acts', 'flops')
         self.pruning = pruning
         self.use_ista = use_ista
-        self.penalty = penalty
         self.delta = delta
         self.interval = interval
         # The key of self.input is conv module, and value of it
@@ -75,24 +73,6 @@ class FisherPruningHook():
         # is number of all the out feature's activations(N*C*H*W)
         # in forward process
         self.acts = {}
-        # The key of self.temp_fisher_info is conv module, and value
-        # is a temporary variable used to estimate fisher.
-        self.temp_fisher_info = {}
-        self.temp_mag_info = {}
-        self.temp_grad_info = {}
-
-        # The key of self.batch_fishers is conv module, and value
-        # is the estimation of fisher by single batch.
-        self.batch_fishers = {}
-        self.batch_mags = {}
-        self.batch_grads = {}
-
-        # The key of self.accum_fishers is conv module, and value
-        # is the estimation of parameter's fisher by all the batch
-        # during number of self.interval iterations.
-        self.accum_fishers = {}
-        self.accum_mags = {}
-        self.accum_grads = {}
         
         self.channels = 0
         self.delta = delta
@@ -124,7 +104,7 @@ class FisherPruningHook():
                 if n: m.name = n
                 self.add_pruning_attrs(m, pruning=self.pruning)
             load_checkpoint(model, self.deploy_from)
-            deploy_pruning(model)
+            self.deploy_pruning(model)
             
         if self.start_from is not None:
             load_checkpoint(model, self.start_from)
@@ -159,86 +139,36 @@ class FisherPruningHook():
             model.train()
             for conv, name in self.conv_names.items():
                 self.conv_inputs[conv] = []
-                # fisher info
-                self.temp_fisher_info[conv] = conv.in_mask.data.new_zeros(len(conv.in_mask)) 
-                self.accum_fishers[conv] = conv.in_mask.data.new_zeros(len(conv.in_mask))
-                # magnitude info
-                self.temp_mag_info[conv] = conv.in_mask.data.new_zeros(len(conv.in_mask)) 
-                self.accum_mags[conv] = conv.in_mask.data.new_zeros(len(conv.in_mask))
-                # gradiant info    
-                self.temp_grad_info[conv] = conv.in_mask.data.new_zeros(len(conv.in_mask)) 
-                self.accum_grads[conv] = conv.in_mask.data.new_zeros(len(conv.in_mask))
-            for group_id in self.groups:
-                module = self.groups[group_id][0]
-                # fisher info
-                self.temp_fisher_info[group_id] = module.in_mask.data.new_zeros(len(module.in_mask))
-                self.accum_fishers[group_id] = module.in_mask.data.new_zeros(len(module.in_mask))
-                # magnitude info
-                self.temp_mag_info[group_id] = module.in_mask.data.new_zeros(len(module.in_mask)) 
-                self.accum_mags[group_id] = module.in_mask.data.new_zeros(len(module.in_mask))
-                # gradiant info    
-                self.temp_grad_info[group_id] = module.in_mask.data.new_zeros(len(module.in_mask)) 
-                self.accum_grads[group_id] = module.in_mask.data.new_zeros(len(module.in_mask))
             self.init_flops_acts()
-            self.init_temp_fishers()
             if self.resume_from is not None:
                 load_checkpoint(model, self.resume_from)
             # register forward hook
             for module, name in self.conv_names.items():
                 module.register_forward_hook(self.save_input_forward_hook)
 
-        self.print_model(model, print_flops_acts=False, print_channel=False)
+        self.print_model(model, print_flops_acts=False, print_channel=True)
 
     def after_backward(self, itr, model):
         if not self.pruning:
             return
-        # compute fisher
-        for module, name in self.conv_names.items():
-            self.compute_fisher_backward(module)
-        # do pruning every interval
-        self.group_fishers()
-        self.accumulate_fishers()
-        self.init_temp_fishers()
         if itr % self.interval == 0:
-            # this makes sure model is converged before each pruning
-            self.channel_prune()
-            self.init_accum_fishers()
+            self.ista()
             self.total_flops, self.total_acts = self.update_flop_act(model)
         self.init_flops_acts()
         
     def plot(self, print_str):
-        # compute fisher
+        scale_factors = torch.tensor([]).cuda()
         for module, name in self.conv_names.items():
-            self.compute_fisher_backward(module)
-        # do pruning every interval
-        self.group_fishers()
-        self.accumulate_fishers()
-        self.init_temp_fishers()
-        # this makes sure model is converged before each pruning
-        self.channel_prune()
-        self.init_accum_fishers()
+            bn_module = self.name2module[module.name.replace('conv','bn')]
+            scale_factors = torch.cat((scale_factors,torch.abs(bn_module.weight.data.view(-1))))
         # plot figure
-        if self.penalty is not None:
-            save_dir = f'metrics/L{int(-math.log10(max(1e-8,abs(self.penalty[0]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[1]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[2]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[3]))))}/'
-        else:
-            save_dir = f'metrics/logq/'
+        save_dir = f'metrics/logq/'
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         fig, axs = plt.subplots(ncols=2, figsize=(10,4))
         # plots
-        #self.fisher_info_list[self.fisher_info_list==0] = 1e-50
-        #self.fisher_info_list = torch.log10(self.fisher_info_list).detach().cpu().numpy()
-        #sns.histplot(self.fisher_info_list, ax=axs[0])
-        #self.grad_info_list[self.grad_info_list==0] = 1e-50
-        #self.grad_info_list = torch.log10(self.grad_info_list).detach().cpu().numpy()
-        #sns.histplot(self.grad_info_list, ax=axs[1])
-        #self.mag_info_list[self.mag_info_list==0] = 1e-50
-        #self.mag_info_list = torch.log10(self.mag_info_list).detach().cpu().numpy()
-        #sns.histplot(self.mag_info_list, ax=axs[2])
-        sns.histplot(self.scale_factors.detach().cpu().numpy(), ax=axs[0])
-        self.scale_factors[self.scale_factors==0] = 1e-50
-        self.scale_factors = torch.log10(self.scale_factors).detach().cpu().numpy()
-        sns.histplot(self.scale_factors, ax=axs[1])
+        sns.histplot(scale_factors.detach().cpu().numpy(), ax=axs[0])
+        sns.histplot(torch.log10(scale_factors).detach().cpu().numpy(), ax=axs[1])
         fig.savefig(save_dir + f'{self.iter:03d}_{print_str}.png')
         plt.close('all')
         self.iter += 1
@@ -283,8 +213,6 @@ class FisherPruningHook():
                 chans_i = int(module.in_mask.sum().cpu().numpy())
                 if hasattr(module, 'child'):
                     child = self.name2module[module.child]
-                    if hasattr(child,'group_master'):
-                        child = self.name2module[child.group_master]
                     chans_o = int(child.in_mask.sum().cpu().numpy())
                 else:
                     chans_o = module.out_channels
@@ -293,8 +221,6 @@ class FisherPruningHook():
             for module, name in self.ln_names.items():
                 if hasattr(module, 'child'):
                     child = self.name2module[module.child]
-                    if hasattr(child,'group_master'):
-                        child = self.name2module[child.group_master]
                     chans_o = int(child.in_mask.sum().cpu().numpy())
                 else:
                     chans_o = module.out_channels
@@ -311,8 +237,6 @@ class FisherPruningHook():
             i_mask = module.in_mask
             if hasattr(module, 'child'):
                 child = self.name2module[module.child]
-                if hasattr(child,'group_master'):
-                    child = self.name2module[child.group_master]
                 real_out_channels = child.in_mask.cpu().sum()
             else:
                 real_out_channels = module.out_channels
@@ -324,166 +248,6 @@ class FisherPruningHook():
             acts += max_act / module.out_channels * real_out_channels
             max_acts += max_act
         return flops / max_flops, acts / max_acts
-
-    def init_accum_fishers(self):
-        """Clear accumulated fisher info."""
-        for module, name in self.conv_names.items():
-            self.accum_fishers[module].zero_()
-            self.accum_mags[module].zero_()
-            self.accum_grads[module].zero_()
-        for group in self.groups:
-            self.accum_fishers[group].zero_()
-            self.accum_mags[group].zero_()
-            self.accum_grads[group].zero_()
-
-    def find_pruning_channel(self, module, fisher, in_mask, info):
-        """Find the the channel of a model to pruning.
-
-        Args:
-            module (nn.Conv | int ): Conv module of model or idx of self.group
-            fisher(Tensor): the fisher information of module's in_mask
-            in_mask (Tensor): the squeeze in_mask of modules
-            info (dict): store the channel of which module need to pruning
-                module: the module has channel need to pruning
-                channel: the index of channel need to pruning
-                min : the value of fisher / delta
-
-        Returns:
-            dict: store the current least important channel
-                module: the module has channel need to be pruned
-                channel: the index of channel need be to pruned
-                min : the value of fisher / delta
-        """
-        module_info = {}
-        # if hasattr(module,'name'):
-        #     print(module.name, fisher.min())
-        # else:
-        #     print(module,fisher.min())
-        if in_mask.sum() > 1:
-            nonzero = in_mask.nonzero().view(-1)
-            fisher = fisher[nonzero]
-            min_value, argmin = fisher.min(dim=0)
-            min_value = float(min_value)
-            if min_value < info['min']:
-                module_info['module'] = module
-                module_info['channel'] = nonzero[argmin]
-                module_info['min'] = min_value
-        return module_info
-
-    def single_prune(self, info, exclude=None):
-        """Find the channel with smallest fisher / delta in modules not in
-        group.
-
-        Args:
-            info (dict): Store the channel of which module need
-                to pruning
-                module: the module has channel need to pruning
-                channel: the index of channel need to pruning
-                min : the value of fisher / delta
-            exclude (list): List contains all modules in group.
-                Default: None
-
-        Returns:
-            dict: store the channel of which module need to be pruned
-                module: the module has channel need to be pruned
-                channel: the index of channel need be to pruned
-                min : the value of fisher / delta
-        """
-        for module, name in self.conv_names.items():
-            if exclude is not None and module in exclude:
-                continue
-            fisher = self.accum_fishers[module]/self.interval
-            mag = self.accum_mags[module]/self.interval
-            grad = self.accum_grads[module]/self.interval
-            in_mask = module.in_mask.view(-1)
-            ancestors = self.conv2ancest[module]
-            if self.delta == 'flops':
-                # delta_flops is a value indicate how much flops is
-                # reduced in entire forward process after we set a
-                # zero in `in_mask` of a specific conv_module.
-                # this affects both current and ancestor module
-                # flops per channel
-                if hasattr(module, 'child'):
-                    child = self.name2module[module.child]
-                    if hasattr(child,'group_master'):
-                        child = self.name2module[child.group_master]
-                    chans_o = child.in_mask.sum()
-                else:
-                    chans_o = module.out_channels
-                delta_flops = self.flops[module] * chans_o / (
-                    module.in_channels * module.out_channels)
-                for ancestor in ancestors:
-                    delta_flops += self.flops[ancestor] * ancestor.in_mask.sum(
-                    ) / (ancestor.in_channels * ancestor.out_channels)
-                fisher /= (float(delta_flops) / 1e9)
-                mag /= (float(delta_flops) / 1e9)
-                grad /= (float(delta_flops) / 1e9)
-            if self.delta == 'acts':
-                # activation only counts ancestors
-                delta_acts = 0
-                for ancestor in ancestors:
-                    delta_acts += self.acts[ancestor] / ancestor.out_channels
-                fisher /= (float(max(delta_acts, 1.)) / 1e6)
-                mag /= (float(max(delta_acts, 1.)) / 1e6)
-                grad /= (float(max(delta_acts, 1.)) / 1e6)
-            self.fisher_info_list = torch.cat((self.fisher_info_list,fisher[in_mask.bool()].view(-1)))
-            self.mag_info_list = torch.cat((self.mag_info_list,mag[in_mask.bool()].view(-1)))
-            self.grad_info_list = torch.cat((self.grad_info_list,grad[in_mask.bool()].view(-1)))
-            bn_module = self.name2module[module.name.replace('conv','bn')]
-            self.scale_factors = torch.cat((self.scale_factors,torch.abs(bn_module.weight.data.view(-1))))
-            info.update(
-                self.find_pruning_channel(module, fisher, in_mask, info))
-                
-        return info
-
-    def channel_prune(self):
-        """Select the channel in model with smallest fisher / delta set
-        corresponding in_mask 0."""
-        
-        # order channels so that noise can be added accordingly
-
-        info = {'module': None, 'channel': None, 'min': 1e15}
-        self.fisher_info_list = torch.tensor([]).cuda()
-        self.mag_info_list = torch.tensor([]).cuda()
-        self.grad_info_list = torch.tensor([]).cuda()
-        self.scale_factors = torch.tensor([]).cuda()
-        info.update(self.single_prune(info, self.group_modules))
-        for group in self.groups:
-            # they share the same in mask
-            in_mask = self.groups[group][0].in_mask.view(-1)
-            fisher = self.accum_fishers[group].double()/self.interval
-            mag = self.accum_mags[group].double()/self.interval
-            grad = self.accum_grads[group].double()/self.interval
-            if self.delta == 'flops':
-                fisher /= float(self.flops[group] / 1e9)
-                mag /= float(self.flops[group] / 1e9)
-                grad /= float(self.flops[group] / 1e9)
-            elif self.delta == 'acts':
-                fisher /= float(self.acts[group] / 1e6)
-                mag /= float(self.acts[group] / 1e6)
-                grad /= float(self.acts[group] / 1e6)
-            self.fisher_info_list = torch.cat((self.fisher_info_list,fisher[in_mask.bool()].view(-1)))
-            self.mag_info_list = torch.cat((self.mag_info_list,mag[in_mask.bool()].view(-1)))
-            self.grad_info_list = torch.cat((self.grad_info_list,grad[in_mask.bool()].view(-1)))
-            for module in self.groups[group]:
-                bn_module = self.name2module[module.name.replace('conv','bn')]
-                self.scale_factors = torch.cat((self.scale_factors,torch.abs(bn_module.weight.data.view(-1))))
-            info.update(self.find_pruning_channel(group, fisher, in_mask, info))
-                
-        module, channel = info['module'], info['channel']
-        if self.penalty is not None:
-            pass
-        elif self.use_ista:
-            self.ista()
-        else:
-            # only modify in_mask is sufficient
-            if isinstance(module, int):
-                # the case for multiple modules in a group
-                for m in self.groups[module]:
-                    m.in_mask[channel] = 0
-            elif module is not None:
-                # the case for single module
-                module.in_mask[channel] = 0
                 
     def ista(self):
         self.ista_err = torch.tensor([0.0]).cuda(0)
@@ -609,76 +373,32 @@ class FisherPruningHook():
                     bn_module.weight.data = redistribute(bn_module.weight.data, assigned_binindices[ch_start:ch_start+ch_len])
                 ch_start += ch_len
             
-    def accumulate_fishers(self):
-        """Accumulate all the fisher during self.interval iterations."""
-
+    def deploy_pruning(self,model):
+        # sort according to factor
+        all_scale_factors = torch.tensor([]).cuda()
+            
         for module, name in self.conv_names.items():
-            self.accum_fishers[module] += self.batch_fishers[module]
-            self.accum_mags[module] += self.batch_mags[module]
-            self.accum_grads[module] += self.batch_grads[module]
-        for group in self.groups:
-            self.accum_fishers[group] += self.batch_fishers[group]
-            self.accum_mags[group] += self.batch_mags[group]
-            self.accum_grads[group] += self.batch_grads[group]
-
-    def group_fishers(self):
-        """Accumulate all module.in_mask's fisher and flops in same group."""
-        # the case for groups
-        for group in self.groups:
-            self.flops[group] = 0
-            self.acts[group] = 0
-            # impact on group members
-            for module in self.groups[group]:
-                # accumulate fisher per channel per batch
-                module_fisher = self.temp_fisher_info[module]
-                self.temp_fisher_info[group] += module_fisher 
-                # accumulate flops per in_channel per batch for each group
-                if hasattr(module, 'child'):
-                    child = self.name2module[module.child]
-                    if hasattr(child,'group_master'):
-                        child = self.name2module[child.group_master]
-                    chans_o = child.in_mask.sum()
-                else:
-                    chans_o = module.out_channels
-                delta_flops = self.flops[module] // module.in_channels // \
-                    module.out_channels * chans_o
-                self.flops[group] += delta_flops
-
-            # sum along the dim of batch
-            self.batch_fishers[group] = self.temp_fisher_info[group]**2
-            self.batch_mags[group] = self.temp_mag_info[module]
-            self.batch_grads[group] = self.temp_grad_info[module]
-
-            # impact on group ancestors, whose out channels are coupled with its
-            # in_channels
-            for module in self.ancest[group]:
-                delta_flops = self.flops[module] // module.out_channels // \
-                    module.in_channels * module.in_mask.sum()
-                self.flops[group] += delta_flops
-                acts = self.acts[module] // module.out_channels
-                self.acts[group] += acts
-        # the case for single modules
+            bn_module = self.name2module[module.name.replace('conv','bn')]
+            all_scale_factors = torch.cat((all_scale_factors,torch.abs(bn_module.weight.data)))
+                
+        _,factor_indices = all_scale_factors.sort()
+        total_channels = len(all_scale_factors)
+        prune_ratio = 0.25
+        removed_channels = int(prune_ratio * total_channels)
+        all_masks = torch.ones(total_channels).long().cuda()
+        all_masks[factor_indices[:removed_channels]] = 0
+        
+        # assign mask back
+        ch_start = 0
         for module, name in self.conv_names.items():
-            self.batch_fishers[module] = self.temp_fisher_info[module]**2
-            self.batch_mags[module] = self.temp_mag_info[module]
-            self.batch_grads[module] = self.temp_grad_info[module]
+            module.in_mask = all_masks[ch_start:ch_start+ch_len]
+            ch_start += ch_len
 
     def init_flops_acts(self):
         """Clear the flops and acts of model in last iter."""
         for module, name in self.conv_names.items():
             self.flops[module] = 0
             self.acts[module] = 0
-
-    def init_temp_fishers(self):
-        """Clear fisher info of single conv and group."""
-        for module, name in self.conv_names.items():
-            self.temp_fisher_info[module].zero_()
-            self.temp_mag_info[module].zero_()
-            self.temp_grad_info[module].zero_()
-        for group in self.groups:
-            self.temp_fisher_info[group].zero_()
-            self.temp_mag_info[group].zero_()
-            self.temp_grad_info[group].zero_()
 
     def save_input_forward_hook(self, module, inputs, outputs):
         """Save the input and flops and acts for computing fisher and flops or
@@ -698,93 +418,6 @@ class FisherPruningHook():
         else:
             print('Unrecognized in save_input_forward_hook:',layer_name)
             exit(0)
-
-        def backward_hook(grad_feature):
-            def compute_fisher(input, grad_input, layer_name):
-                # information per mask channel per module
-                grads = input * grad_input
-                if layer_name in ['Conv2d']:
-                    grads = grads.sum(-1).sum(-1).sum(0)
-                else:
-                    print('Unrecognized in compute_fisher:',layer_name)
-                    exit(0)
-                return grads
-                
-            def compute_mag(input, grad_input, layer_name):
-                # information per mask channel per module
-                grads = torch.abs(input)
-                if layer_name in ['Conv2d']:
-                    grads = grads.sum(-1).sum(-1).sum(0)
-                else:
-                    print('Unrecognized in compute_fisher:',layer_name)
-                    exit(0)
-                return grads
-                
-            def compute_grad(input, grad_input, layer_name):
-                # information per mask channel per module
-                grads = torch.abs(grad_input)
-                if layer_name in ['Conv2d']:
-                    grads = grads.sum(-1).sum(-1).sum(0)
-                else:
-                    print('Unrecognized in compute_fisher:',layer_name)
-                    exit(0)
-                return grads
-
-            layer_name = type(module).__name__
-            feature = self.conv_inputs[module].pop(-1)[0]
-            self.temp_fisher_info[module] += compute_fisher(feature, grad_feature, layer_name)
-            self.temp_mag_info[module] += compute_mag(feature, grad_feature, layer_name)
-            self.temp_grad_info[module] += compute_grad(feature, grad_feature, layer_name)
-            
-        # alternate way to compute fisher information
-        #if inputs[0].requires_grad:
-            #inputs[0].register_hook(backward_hook)
-        #    self.conv_inputs[module].append(inputs)
-
-    def compute_fisher_backward(self, module):
-        # there are some bugs in torch, not using the backward hook
-        """
-        Args:
-            module (nn.Module): module register hooks
-            grad_input (tuple): tuple contains grad of input and parameters,
-                grad_input[0]is the grad of input in Pytorch 1.3, it seems
-                has changed in Higher version
-        """
-        def compute_fisher(weight, grad_weight, layer_name):
-            # information per mask channel per module
-            grads = weight*grad_weight
-            if layer_name in ['Conv2d']:
-                grads = grads.sum(-1).sum(-1).sum(0)
-            else:
-                print('Unrecognized in compute_fisher:',layer_name)
-                exit(0)
-            return grads
-        
-        def compute_mag(weight, grad_weight, layer_name):
-            # information per mask channel per module
-            grads = torch.abs(weight)
-            if layer_name in ['Conv2d']:
-                grads = grads.sum(-1).sum(-1).sum(0)
-            else:
-                print('Unrecognized in compute_fisher:',layer_name)
-                exit(0)
-            return grads
-            
-        def compute_grad(weight, grad_weight, layer_name):
-            # information per mask channel per module
-            grads = torch.abs(grad_weight)
-            if layer_name in ['Conv2d']:
-                grads = grads.sum(-1).sum(-1).sum(0)
-            else:
-                print('Unrecognized in compute_fisher:',layer_name)
-                exit(0)
-            return grads
-
-        layer_name = type(module).__name__
-        weight = module.weight
-        self.temp_fisher_info[module] += compute_fisher(weight, weight.grad, layer_name)
-        self.temp_mag_info[module] += compute_mag(weight, weight.grad, layer_name)
-        self.temp_grad_info[module] += compute_grad(weight, weight.grad, layer_name)
 
     def make_groups(self):
         """The modules (convolutions and BNs) connected to the same conv need
@@ -951,44 +584,3 @@ class FisherPruningHook():
         if  type(module).__name__ == 'BatchNorm2d':
             # no need to modify layernorm during pruning since it is not computed over channels
             pass
-
-
-    def deploy_pruning(self, model):
-        """To speed up the finetune process, We change the shape of parameter
-        according to the `in_mask` and `out_mask` in it."""
-
-        for name, module in model.named_modules():
-            if type(module).__name__ == 'Conv2d':
-                module.finetune = True
-                requires_grad = module.weight.requires_grad
-                if hasattr(module, 'child'):
-                    child = self.name2module[module.child]
-                    if hasattr(child,'group_master'):
-                        child = self.name2module[child.group_master]
-                    out_mask = child.in_mask.bool()
-                else:
-                    out_mask = None
-                in_mask = module.in_mask.bool()
-                if hasattr(module, 'bias') and module.bias is not None and out_mask is not None:
-                    module.bias = nn.Parameter(module.bias.data[out_mask])
-                    module.bias.requires_grad = requires_grad
-                if out_mask is not None:
-                    temp_weight = module.weight.data[out_mask]
-                    module.weight = nn.Parameter(temp_weight[:, in_mask].data)
-                    module.weight.requires_grad = requires_grad
-
-            elif type(module).__name__ == 'BatchNorm2d':
-                if hasattr(module, 'child'):
-                    child = self.name2module[module.child]
-                    if hasattr(child,'group_master'):
-                        child = self.name2module[child.group_master]
-                    out_mask = child.in_mask.bool()
-                else:
-                    out_mask = None
-                requires_grad = module.weight.requires_grad
-                if out_mask is not None:
-                    module.normalized_shape = (int(out_mask.sum()),)
-                    module.weight = nn.Parameter(module.weight.data[out_mask].data)
-                    module.bias = nn.Parameter(module.bias.data[out_mask].data)
-                    module.weight.requires_grad = requires_grad
-                    module.bias.requires_grad = requires_grad
