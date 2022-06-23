@@ -151,8 +151,7 @@ class FisherPruningHook():
         fig, axs = plt.subplots(ncols=2, figsize=(10,4))
         # plots
         sns.histplot(scale_factors.detach().cpu().numpy(), ax=axs[0])
-        scale_factors[scale_factors==0.] = 1e-50
-        print(scale_factors.min())
+        scale_factors = torch.clamp(scale_factors,min=1e-10)
         sns.histplot(torch.log10(scale_factors).detach().cpu().numpy(), ax=axs[1])
         fig.savefig(save_dir + f'{self.iter:03d}_{print_str}.png')
         plt.close('all')
