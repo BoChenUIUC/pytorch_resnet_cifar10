@@ -98,6 +98,9 @@ class FisherPruningHook():
         We add this function to ensure that this happens before DDP's
         optimizer's initialization
         """
+            
+        if self.start_from is not None:
+            load_checkpoint(model, self.start_from)
         
         self.conv_names = OrderedDict() # prunable
         self.ln_names = OrderedDict()
@@ -105,27 +108,13 @@ class FisherPruningHook():
 
         for n, m in model.named_modules():
             if n: m.name = n
-            if self.pruning:
-                self.add_pruning_attrs(m, pruning=self.pruning)
+            self.add_pruning_attrs(m, pruning=self.pruning)
             if isinstance(m, nn.Conv2d):
                 self.conv_names[m] = n
                 self.name2module[n] = m
             elif isinstance(m, nn.BatchNorm2d):
                 self.ln_names[m] = n
                 self.name2module[n] = m
-                
-        if not self.pruning:
-            load_checkpoint(model, self.deploy_from)
-            self.deploy_pruning(model)
-            
-        if self.start_from is not None:
-            load_checkpoint(model, self.start_from)
-
-    def before_run(self, model):
-        """Initialize the relevant variables(fisher, flops and acts) for
-        calculating the importance of the channel, and use the layer-grouping
-        algorithm to make the coupled module shared the mask of input
-        channel."""
 
         if self.pruning:
             # divide the conv to several group and all convs in same
@@ -142,6 +131,9 @@ class FisherPruningHook():
             # register forward hook
             for module, name in self.conv_names.items():
                 module.register_forward_hook(self.save_input_forward_hook)
+        else:
+            load_checkpoint(model, self.deploy_from)
+            self.deploy_pruning(model)
 
         self.print_model(model, print_flops_acts=False, print_channel=True)
 

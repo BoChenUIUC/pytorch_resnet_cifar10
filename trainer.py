@@ -93,7 +93,6 @@ def main():
         else:
             hook = FisherPruningHook(pruning=False, use_ista=True, deploy_from=args.prune)
         hook.after_build_model(model)
-        hook.before_run(model)
 
     cudnn.benchmark = True
 
