@@ -359,7 +359,7 @@ class FisherPruningHook():
             all_scale_factors = torch.cat((all_scale_factors,torch.abs(bn_module.weight.data)))
                 
         sorted,factor_indices = all_scale_factors.sort()
-        print(sorted)
+        print(sorted[:100])
         total_channels = len(all_scale_factors)
         prune_ratio = 0.25
         removed_channels = int(prune_ratio * total_channels)
