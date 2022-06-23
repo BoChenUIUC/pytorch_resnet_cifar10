@@ -522,7 +522,7 @@ class FisherPruningHook():
                     conv2ancest[m] += [self.name2module[name]]
                     
             if ancestor is not None:
-                module.ancestor = self.name2module[ancestor]
+                m.ancestor = self.name2module[ancestor]
                     
             # find child
             if 'conv1' == n or 'bn1' == n:
