@@ -221,7 +221,7 @@ class FisherPruningHook():
         if self.penalty is not None:
             save_dir = f'metrics/L{int(-math.log10(max(1e-8,abs(self.penalty[0]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[1]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[2]))))}_{int(-math.log10(max(1e-8,abs(self.penalty[3]))))}/'
         else:
-            save_dir = f'metrics/logq/'
+            save_dir = f'metrics/base/'
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         fig, axs = plt.subplots(ncols=2, figsize=(10,4))
@@ -501,9 +501,10 @@ class FisherPruningHook():
         # small: maintain good performance but may not affect distribution much
         decay_factor = 1e-3 # lower this to improve perf
         # how small/low rank bins get more advantage
-        amp_factors = torch.tensor([8.,4.,2.,1.]).cuda()
+        amp_factors = torch.tensor([2**(num_bins-1-x) for x in range(num_bins)]).cuda()
         self.ista_err_bins = [0 for _ in range(num_bins)]
         self.ista_cnt_bins = [0 for _ in range(num_bins)]
+        return
         
         def exp_quantization(x):
             x = torch.clamp(torch.abs(x), min=1e-8) * torch.sign(x)
