@@ -493,7 +493,7 @@ class FisherPruningHook():
         # distance between bins min=2
         bin_stride = 2
         # how centralize the bin is
-        bin_width = 2e-1
+        bin_width = 1e-1
         # locations we want to quantize
         bins = torch.pow(10.,torch.tensor([bin_start+bin_stride*x for x in range(num_bins)])).cuda(0)
         # trade-off of original distribution and new distribution
