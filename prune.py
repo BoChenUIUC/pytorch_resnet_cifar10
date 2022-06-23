@@ -366,7 +366,7 @@ class FisherPruningHook():
         print('remove:',removed_channels)
         all_masks = torch.ones(total_channels).long().cuda()
         all_masks[factor_indices[:removed_channels]] = 0
-        
+        return
         # assign mask back
         ch_start = 0
         for module, name in self.conv_names.items():
