@@ -140,6 +140,7 @@ def main():
 
     if args.evaluate:
         prec1 = validate(val_loader, model, criterion)
+        print(f' * Prec@1 {prec1:.3f}. ')
         print_str = f"{prec1:.3f}"
         hook.plot(print_str)
         return
