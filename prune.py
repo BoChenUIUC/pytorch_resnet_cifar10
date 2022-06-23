@@ -491,20 +491,16 @@ class FisherPruningHook():
             # find ancestors
             if 'conv1' == n:
                 ancestors = []
-                ancestor = None
             elif 'conv' in n:
                 a,b,c = re.findall(r'\d+',n)
                 if c == '1':
                     if b == '0':
                         if a == '1':
                             ancestors = ['conv1']
-                            ancestor = 'conv1'
                         elif a == '2':
                             ancestors = ['layer1.8.conv2']
-                            ancestor = 'layer1.8.conv2'
                         else:
                             ancestors = ['layer2.8.conv2']
-                            ancestor = 'layer2.8.conv2'
                     else:
                         if a == '1':
                             ancestors = ['layer1.0.conv2',f'layer1.{int(b)-1}.conv2']
@@ -512,19 +508,14 @@ class FisherPruningHook():
                             ancestors = ['layer2.0.conv2',f'layer2.{int(b)-1}.conv2']
                         else:
                             ancestors = ['layer3.0.conv2',f'layer3.{int(b)-1}.conv2']
-                        ancestor = f'layer{a}.{int(b)-1}.conv2'
                 else:
                     ancestors = [f'layer{a}.{b}.conv1']
-                    ancestor = f'layer{a}.{b}.conv1'
 
             if type(m).__name__ in ['Conv2d']:
                 conv2ancest[m] = []
             for name in ancestors:
                 if type(m).__name__ in ['Conv2d']:
                     conv2ancest[m] += [self.name2module[name]]
-                    
-            if ancestor is not None:
-                m.ancestor = self.name2module[ancestor]
                     
             # find child
             if 'conv1' == n or 'bn1' == n:
