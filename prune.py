@@ -380,6 +380,8 @@ class FisherPruningHook():
         # assign mask back
         ch_start = 0
         for module, name in self.conv_names.items():
+            bn_module = self.name2module[module.name.replace('conv','bn')]
+            ch_len = len(bn_module.weight.data)
             module.in_mask = all_masks[ch_start:ch_start+ch_len]
             ch_start += ch_len
 
