@@ -488,8 +488,8 @@ class FisherPruningHook():
     def ista(self):
         self.ista_err = torch.tensor([0.0]).cuda(0)
         # locations of bins should fit original dist
-        num_bins = 3
-        bin_start = -4
+        num_bins = 4
+        bin_start = -6
         # distance between bins min=2
         bin_stride = 2
         # how centralize the bin is
@@ -545,8 +545,6 @@ class FisherPruningHook():
             amp = amp_factors[bin_indices]
             all_err = torch.log10(tar_bins/torch.abs(x))
             abs_err = torch.abs(all_err)
-            abs_err[bins[-1]<torch.abs(x)] = 0
-            abs_err[bins[0]>torch.abs(x)] = 0
             # more distant larger multiplier
             # pull force relates to distance and target bin (how off-distribution is it?)
             # low rank bin gets higher pull force
