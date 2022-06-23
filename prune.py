@@ -360,6 +360,7 @@ class FisherPruningHook():
                 
         sorted,factor_indices = all_scale_factors.sort()
         print(sorted[:100])
+        print(sorted[-100:])
         total_channels = len(all_scale_factors)
         prune_ratio = 0.25
         removed_channels = int(prune_ratio * total_channels)
