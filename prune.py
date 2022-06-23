@@ -367,6 +367,7 @@ class FisherPruningHook():
         # assign mask back
         ch_start = 0
         for module, name in self.conv_names.items():
+            # find child of this bn
             bn_module = self.name2module[module.name.replace('conv','bn')]
             ch_len = len(bn_module.weight.data)
             module.in_mask = all_masks[ch_start:ch_start+ch_len]
@@ -485,34 +486,43 @@ class FisherPruningHook():
         for n, m in model.named_modules():
             if type(m).__name__ not in ['Conv2d','BatchNorm2d']:
                 continue
-            # independent nets
+            # find ancestors
             if 'conv1' == n:
-                ancest_name = []
+                ancestors = []
+                ancestor = None
             elif 'conv' in n:
                 a,b,c = re.findall(r'\d+',n)
                 if c == '1':
                     if b == '0':
                         if a == '1':
-                            ancest_name = ['conv1']
+                            ancestors = ['conv1']
+                            ancestor = 'conv1'
                         elif a == '2':
-                            ancest_name = ['layer1.8.conv2']
+                            ancestors = ['layer1.8.conv2']
+                            ancestor = 'layer1.8.conv2'
                         else:
-                            ancest_name = ['layer2.8.conv2']
+                            ancestors = ['layer2.8.conv2']
+                            ancestor = 'layer2.8.conv2'
                     else:
                         if a == '1':
-                            ancest_name = ['layer1.0.conv2',f'layer1.{int(b)-1}.conv2']
+                            ancestors = ['layer1.0.conv2',f'layer1.{int(b)-1}.conv2']
                         elif a == '2':
-                            ancest_name = ['layer2.0.conv2',f'layer2.{int(b)-1}.conv2']
+                            ancestors = ['layer2.0.conv2',f'layer2.{int(b)-1}.conv2']
                         else:
-                            ancest_name = ['layer3.0.conv2',f'layer3.{int(b)-1}.conv2']
+                            ancestors = ['layer3.0.conv2',f'layer3.{int(b)-1}.conv2']
+                        ancestor = f'layer{a}.{int(b)-1}.conv2'
                 else:
-                    ancest_name = [f'layer{a}.{b}.conv1']
+                    ancestors = [f'layer{a}.{b}.conv1']
+                    ancestor = f'layer{a}.{b}.conv1'
 
             if type(m).__name__ in ['Conv2d']:
                 conv2ancest[m] = []
-            for name in ancest_name:
+            for name in ancestors:
                 if type(m).__name__ in ['Conv2d']:
                     conv2ancest[m] += [self.name2module[name]]
+                    
+            if ancestor is not None:
+                module.ancestor = self.name2module[ancestor]
                     
             # find child
             if 'conv1' == n or 'bn1' == n:
@@ -532,8 +542,8 @@ class FisherPruningHook():
             
         self.conv2ancest = conv2ancest
         
-        for m in conv2ancest:
-            print(m.name,[x.name for x in conv2ancest[m]])
+        for n, m in model.named_modules():
+            print(n, m.child)
         exit(0)
 
     def add_pruning_attrs(self, module, pruning=False):
