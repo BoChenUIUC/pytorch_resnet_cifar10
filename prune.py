@@ -145,7 +145,7 @@ class FisherPruningHook():
             bn_module = self.name2module[module.name.replace('conv','bn')]
             scale_factors = torch.cat((scale_factors,torch.abs(bn_module.weight.data.view(-1))))
         # plot figure
-        save_dir = f'metrics/l1normn4/'
+        save_dir = f'metrics/l1normn6/'
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         fig, axs = plt.subplots(ncols=2, figsize=(10,4))
@@ -233,7 +233,7 @@ class FisherPruningHook():
             bn_module = self.name2module[module.name.replace('conv','bn')]
             all_scale_factors = torch.cat((all_scale_factors,torch.abs(bn_module.weight.data)))
             
-        return 1e4*all_scale_factors.norm(p=1)
+        return 1e6*all_scale_factors.norm(p=1)
                 
     def ista(self):
         self.ista_err = torch.tensor([0.0]).cuda(0)
