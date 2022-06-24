@@ -375,7 +375,9 @@ class FisherPruningHook():
             with torch.no_grad():
                 ch_len = len(bn_module.weight.data)
                 bn_mask = all_masks[ch_start:ch_start+ch_len]
-                print(name,bn_module.weight.data[not torch.non_zero(bn_mask)])
+                print(name)
+                print(bn_module.weight.data)
+                print(bn_mask)
                 bn_module.weight.data *= bn_mask
             #if hasattr(module, 'child'):
             #    child = self.name2module[module.child]
