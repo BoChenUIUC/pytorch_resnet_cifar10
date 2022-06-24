@@ -366,6 +366,7 @@ class FisherPruningHook():
         all_masks = torch.ones(total_channels).long().cuda()
         all_masks[factor_indices[:removed_channels]] = 0
         print(all_scale_factors[factor_indices[:removed_channels]])
+        print()
         exit(0)
         
         # assign mask back
@@ -376,6 +377,7 @@ class FisherPruningHook():
             with torch.no_grad():
                 ch_len = len(bn_module.weight.data)
                 bn_mask = all_masks[ch_start:ch_start+ch_len]
+                print(name,bn_module.weight.data[bn_mask])
                 bn_module.weight.data[bn_mask] = 0
             #if hasattr(module, 'child'):
             #    child = self.name2module[module.child]
