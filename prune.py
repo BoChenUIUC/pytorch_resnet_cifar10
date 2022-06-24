@@ -359,16 +359,17 @@ class FisherPruningHook():
             all_scale_factors = torch.cat((all_scale_factors,torch.abs(bn_module.weight.data)))
                 
         sorted,factor_indices = all_scale_factors.sort()
-        print(sorted[:100])
-        print(sorted[-100:])
         total_channels = len(all_scale_factors)
         prune_ratio = 0.25
         removed_channels = int(prune_ratio * total_channels)
         print('remove:',removed_channels)
         all_masks = torch.ones(total_channels).long().cuda()
         all_masks[factor_indices[:removed_channels]] = 0
-        return
+        print(all_scale_factors[factor_indices[:removed_channels]])
+        exit(0)
+        
         # assign mask back
+        # todo check remove the right channels
         ch_start = 0
         for module, name in self.conv_names.items():
             bn_module = self.name2module[module.name.replace('conv','bn')]
