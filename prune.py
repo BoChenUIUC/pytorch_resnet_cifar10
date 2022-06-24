@@ -225,6 +225,15 @@ class FisherPruningHook():
             acts += max_act / module.out_channels * real_out_channels
             max_acts += max_act
         return flops / max_flops, acts / max_acts
+        
+    def factor_norm(self):
+        all_scale_factors = torch.tensor([]).cuda()
+            
+        for module, name in self.conv_names.items():
+            bn_module = self.name2module[module.name.replace('conv','bn')]
+            all_scale_factors = torch.cat((all_scale_factors,torch.abs(bn_module.weight.data)))
+            
+        return 1e-4*all_scale_factors.norm(p=1)
                 
     def ista(self):
         self.ista_err = torch.tensor([0.0]).cuda(0)
@@ -297,21 +306,10 @@ class FisherPruningHook():
         all_scale_factors = torch.tensor([]).cuda()
             
         for module, name in self.conv_names.items():
-            if self.group_modules is not None and module in self.group_modules:
-                continue  
             bn_module = self.name2module[module.name.replace('conv','bn')]
             with torch.no_grad():
-                #bn_module.weight.data = exp_quantization(bn_module.weight.data)
                 get_bin_distribution(bn_module.weight.data)
             all_scale_factors = torch.cat((all_scale_factors,torch.abs(bn_module.weight.data)))
-            
-        for group in self.groups:
-            for module in self.groups[group]:
-                bn_module = self.name2module[module.name.replace('conv','bn')]
-                with torch.no_grad():
-                    #bn_module.weight.data = exp_quantization(bn_module.weight.data)
-                    get_bin_distribution(bn_module.weight.data)
-                all_scale_factors = torch.cat((all_scale_factors,torch.abs(bn_module.weight.data)))
                     
         # total channels
         total_channels = len(all_scale_factors)
@@ -334,21 +332,11 @@ class FisherPruningHook():
         
         ch_start = 0
         for module, name in self.conv_names.items():
-            if self.group_modules is not None and module in self.group_modules:
-                continue  
             bn_module = self.name2module[module.name.replace('conv','bn')]
             with torch.no_grad():
                 ch_len = len(bn_module.weight.data)
                 bn_module.weight.data = redistribute(bn_module.weight.data, assigned_binindices[ch_start:ch_start+ch_len])
             ch_start += ch_len
-            
-        for group in self.groups:
-            for module in self.groups[group]:
-                bn_module = self.name2module[module.name.replace('conv','bn')]
-                with torch.no_grad():
-                    ch_len = len(bn_module.weight.data)
-                    bn_module.weight.data = redistribute(bn_module.weight.data, assigned_binindices[ch_start:ch_start+ch_len])
-                ch_start += ch_len
             
     def deploy_pruning(self,model):
         # sort according to factor
