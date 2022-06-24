@@ -153,7 +153,7 @@ def main():
         lr_scheduler.step()
 
         # evaluate on validation set
-        prec1 = validate(val_loader, model, criterion, hook if args.prune else None)
+        prec1 = validate(val_loader, model, criterion)
         
         ista_err = hook.ista_err.cpu().item()
         print(f' * Prec@1 {prec1:.3f}. ')

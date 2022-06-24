@@ -254,6 +254,7 @@ class FisherPruningHook():
         amp_factors = torch.tensor([2**(num_bins-1-x) for x in range(num_bins)]).cuda()
         self.ista_err_bins = [0 for _ in range(num_bins)]
         self.ista_cnt_bins = [0 for _ in range(num_bins)]
+        return
         
         def exp_quantization(x):
             x = torch.clamp(torch.abs(x), min=1e-8) * torch.sign(x)
