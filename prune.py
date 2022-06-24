@@ -375,14 +375,13 @@ class FisherPruningHook():
             with torch.no_grad():
                 ch_len = len(bn_module.weight.data)
                 bn_mask = all_masks[ch_start:ch_start+ch_len]
-                print(name,bn_module.weight.data[bn_mask])
-                bn_module.weight.data[bn_mask] = 0
+                print(name,bn_module.weight.data[not bn_mask.non_zero()])
+                bn_module.weight.data *= bn_mask
             #if hasattr(module, 'child'):
             #    child = self.name2module[module.child]
             #    ch_len = len(child.in_mask)
             #    child.in_mask[:] = all_masks[ch_start:ch_start+ch_len]
             ch_start += ch_len
-        print(len(all_masks),ch_start)
         exit(0)
 
     def init_flops_acts(self):
