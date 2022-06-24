@@ -366,8 +366,6 @@ class FisherPruningHook():
         all_masks = torch.ones(total_channels).long().cuda()
         all_masks[factor_indices[:removed_channels]] = 0
         print(all_scale_factors[factor_indices[:removed_channels]])
-        print()
-        exit(0)
         
         # assign mask back
         # todo check remove the right channels
@@ -384,6 +382,7 @@ class FisherPruningHook():
             #    ch_len = len(child.in_mask)
             #    child.in_mask[:] = all_masks[ch_start:ch_start+ch_len]
             ch_start += ch_len
+        exit(0)
 
     def init_flops_acts(self):
         """Clear the flops and acts of model in last iter."""
