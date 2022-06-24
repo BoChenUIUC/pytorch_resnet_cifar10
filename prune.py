@@ -365,7 +365,6 @@ class FisherPruningHook():
         print('remove:',removed_channels)
         all_masks = torch.ones(total_channels).long().cuda()
         all_masks[factor_indices[:removed_channels]] = 0
-        print(all_scale_factors[factor_indices[:removed_channels]])
         
         # assign mask back
         # todo check remove the right channels
@@ -375,14 +374,7 @@ class FisherPruningHook():
             with torch.no_grad():
                 ch_len = len(bn_module.weight.data)
                 bn_mask = all_masks[ch_start:ch_start+ch_len]
-                print(name)
-                print(bn_module.weight.data)
-                print(bn_mask)
                 bn_module.weight.data *= bn_mask
-            #if hasattr(module, 'child'):
-            #    child = self.name2module[module.child]
-            #    ch_len = len(child.in_mask)
-            #    child.in_mask[:] = all_masks[ch_start:ch_start+ch_len]
             ch_start += ch_len
 
     def init_flops_acts(self):
