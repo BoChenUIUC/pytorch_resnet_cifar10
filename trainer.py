@@ -160,7 +160,7 @@ def main():
         print('BinErr:', " ".join(format(x, ".3f") for x in hook.ista_err_bins))
         print('BinCnt:', " ".join(format(x, "05d") for x in hook.ista_cnt_bins))
               
-        print_str = f"{top1.avg:.3f}_{ista_err:.4f}"
+        print_str = f"{prec1:.3f}_{ista_err:.4f}"
         hook.plot(print_str)
         
         # remember best prec@1 and save checkpoint
