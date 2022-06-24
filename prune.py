@@ -145,7 +145,7 @@ class FisherPruningHook():
             bn_module = self.name2module[module.name.replace('conv','bn')]
             scale_factors = torch.cat((scale_factors,torch.abs(bn_module.weight.data.view(-1))))
         # plot figure
-        save_dir = f'metrics/logq/'
+        save_dir = f'metrics/l1norm4/'
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         fig, axs = plt.subplots(ncols=2, figsize=(10,4))
