@@ -233,7 +233,7 @@ class FisherPruningHook():
             bn_module = self.name2module[module.name.replace('conv','bn')]
             all_scale_factors = torch.cat((all_scale_factors,torch.abs(bn_module.weight.data)))
             
-        return 1e-2*all_scale_factors.norm(p=1)
+        return 1e-0*all_scale_factors.norm(p=1)
                 
     def ista(self):
         self.ista_err = torch.tensor([0.0]).cuda(0)
