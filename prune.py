@@ -348,7 +348,7 @@ class FisherPruningHook():
                 
         sorted,factor_indices = all_scale_factors.sort()
         total_channels = len(all_scale_factors)
-        prune_ratio = 0.25
+        prune_ratio = 0.5
         removed_channels = int(prune_ratio * total_channels)
         print('remove:',removed_channels)
         all_masks = torch.ones(total_channels).long().cuda()
