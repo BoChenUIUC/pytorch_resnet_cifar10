@@ -9,5 +9,5 @@ do
 	# L1-norm
 	
 	# log quantization
-	python -u trainer.py --prune=save_resnet56/best_log4.th  --arch=$model --evaluate
+	python -u trainer.py --prune=save_resnet56/best_log4_s1.th  --arch=$model --evaluate
 done
