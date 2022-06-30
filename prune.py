@@ -145,7 +145,7 @@ class FisherPruningHook():
             bn_module = self.name2module[module.name.replace('conv','bn')]
             scale_factors = torch.cat((scale_factors,torch.abs(bn_module.weight.data.view(-1))))
         # plot figure
-        save_dir = f'metrics/logq/'
+        save_dir = f'metrics/logq4_s1/'
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         fig, axs = plt.subplots(ncols=2, figsize=(10,4))
@@ -238,10 +238,10 @@ class FisherPruningHook():
     def ista(self):
         self.ista_err = torch.tensor([0.0]).cuda(0)
         # locations of bins should fit original dist
-        num_bins = 4
-        bin_start = -6
+        num_bins = 6
+        bin_start = -5
         # distance between bins min=2
-        bin_stride = 2
+        bin_stride = 1
         # how centralize the bin is
         bin_width = 1e-1
         # locations we want to quantize
@@ -249,7 +249,7 @@ class FisherPruningHook():
         # trade-off of original distribution and new distribution
         # big: easy to get new distribution, but may degrade performance
         # small: maintain good performance but may not affect distribution much
-        decay_factor = 1e-3 # lower this to improve perf
+        decay_factor = 1e-4 # lower this to improve perf
         # how small/low rank bins get more advantage
         amp_factors = torch.tensor([2**(num_bins-1-x) for x in range(num_bins)]).cuda()
         self.ista_err_bins = [0 for _ in range(num_bins)]
