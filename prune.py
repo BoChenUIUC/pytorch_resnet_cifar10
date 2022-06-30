@@ -145,7 +145,7 @@ class FisherPruningHook():
             bn_module = self.name2module[module.name.replace('conv','bn')]
             scale_factors = torch.cat((scale_factors,torch.abs(bn_module.weight.data.view(-1))))
         # plot figure
-        save_dir = f'metrics/l1normn10/'
+        save_dir = f'metrics/logq/'
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         fig, axs = plt.subplots(ncols=2, figsize=(10,4))
@@ -254,7 +254,6 @@ class FisherPruningHook():
         amp_factors = torch.tensor([2**(num_bins-1-x) for x in range(num_bins)]).cuda()
         self.ista_err_bins = [0 for _ in range(num_bins)]
         self.ista_cnt_bins = [0 for _ in range(num_bins)]
-        return
         
         def exp_quantization(x):
             x = torch.clamp(torch.abs(x), min=1e-8) * torch.sign(x)
